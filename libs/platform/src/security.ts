@@ -148,8 +148,11 @@ export function sanitizeFilename(filename: string): string {
     throw new Error('Filename must be a non-empty string');
   }
 
+  // Normalize path separators to forward slashes first (handles Windows paths on Unix)
+  let normalized = filename.replace(/\\/g, '/');
+
   // Remove path components - only keep the basename
-  let sanitized = path.basename(filename);
+  let sanitized = path.basename(normalized);
 
   // Remove any remaining path traversal attempts
   sanitized = sanitized.replace(/\.\./g, '');
@@ -157,17 +160,15 @@ export function sanitizeFilename(filename: string): string {
   // Remove null bytes (security: can bypass extension checks)
   sanitized = sanitized.replace(/\0/g, '');
 
+  // Remove any remaining path separators and drive letters (/, \, :)
+  sanitized = sanitized.replace(/[/\\:]/g, '');
+
   // Remove leading/trailing dots and whitespace
   sanitized = sanitized.trim().replace(/^\.+/, '');
 
   // Validate result is not empty
   if (!sanitized) {
     throw new Error(`Invalid filename: "${filename}" cannot be sanitized to a safe name`);
-  }
-
-  // Ensure it doesn't start with a path separator
-  if (sanitized.startsWith('/') || sanitized.startsWith('\\')) {
-    sanitized = sanitized.substring(1);
   }
 
   return sanitized;

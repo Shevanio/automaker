@@ -51,6 +51,20 @@ import {
 const execAsync = promisify(exec);
 const logger = createLogger('AutoMode');
 
+/**
+ * Type guard to validate Feature object structure
+ */
+function isFeature(obj: unknown): obj is Feature {
+  if (!obj || typeof obj !== 'object') return false;
+  const feature = obj as Partial<Feature>;
+  return (
+    typeof feature.id === 'string' &&
+    typeof feature.category === 'string' &&
+    typeof feature.description === 'string' &&
+    typeof feature.status === 'string'
+  );
+}
+
 // Planning mode types for spec-driven development
 type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 
@@ -1667,8 +1681,17 @@ Format your response as a structured markdown document.`;
 
     try {
       const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
-      return JSON.parse(data);
-    } catch {
+      const parsed = JSON.parse(data);
+
+      // Validate the parsed object is a Feature
+      if (!isFeature(parsed)) {
+        logger.error(`Invalid feature data for ${featureId}: missing required fields`);
+        return null;
+      }
+
+      return parsed;
+    } catch (error) {
+      logger.error(`Failed to load feature ${featureId}:`, error);
       return null;
     }
   }
@@ -1684,8 +1707,15 @@ Format your response as a structured markdown document.`;
 
     try {
       const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
-      const feature = JSON.parse(data);
-      feature.status = status;
+      const parsed = JSON.parse(data);
+
+      if (!isFeature(parsed)) {
+        throw new Error(`Invalid feature data for ${featureId}: missing required fields`);
+      }
+
+      const feature = parsed;
+      // Status parameter is validated by caller, safe to cast
+      feature.status = status as Feature['status'];
       feature.updatedAt = new Date().toISOString();
       // Set justFinishedAt timestamp when moving to waiting_approval (agent just completed)
       // Badge will show for 2 minutes after this timestamp
@@ -1713,7 +1743,13 @@ Format your response as a structured markdown document.`;
 
     try {
       const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
-      const feature = JSON.parse(data);
+      const parsed = JSON.parse(data);
+
+      if (!isFeature(parsed)) {
+        throw new Error(`Invalid feature data for ${featureId}: missing required fields`);
+      }
+
+      const feature = parsed;
 
       // Initialize planSpec if it doesn't exist
       if (!feature.planSpec) {
@@ -1757,9 +1793,16 @@ Format your response as a structured markdown document.`;
           const featurePath = path.join(featuresDir, entry.name, 'feature.json');
           try {
             const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
-            const feature = JSON.parse(data);
-            return feature;
-          } catch {
+            const parsed = JSON.parse(data);
+
+            if (!isFeature(parsed)) {
+              logger.warn(`Skipping invalid feature ${entry.name}: missing required fields`);
+              return null;
+            }
+
+            return parsed;
+          } catch (error) {
+            logger.warn(`Skipping feature ${entry.name}: parse error`, error);
             // Skip invalid features
             return null;
           }

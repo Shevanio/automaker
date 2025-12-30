@@ -16,6 +16,7 @@ import {
   isAbortError,
   classifyError,
   loadContextFiles,
+  createLogger,
 } from '@automaker/utils';
 import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
@@ -47,6 +48,7 @@ import {
 } from '../lib/settings-helpers.js';
 
 const execAsync = promisify(exec);
+const logger = createLogger('AutoMode');
 
 // Planning mode types for spec-driven development
 type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
@@ -399,7 +401,7 @@ export class AutoModeService {
 
     // Run the loop in the background
     this.runAutoLoop().catch((error) => {
-      console.error('[AutoMode] Loop error:', error);
+      logger.error('Auto-loop error', { error: error.message, stack: error.stack });
       const errorInfo = classifyError(error);
 
       // Ensure state is cleaned up on fatal error
@@ -451,13 +453,16 @@ export class AutoModeService {
               this.config!.useWorktrees,
               true
             ).catch((error) => {
-              console.error(`[AutoMode] Feature ${nextFeature.id} error:`, error);
+              logger.error('Feature execution error', {
+                featureId: nextFeature.id,
+                error: error.message,
+              });
             });
           }
 
           await this.sleep(2000);
         } catch (error) {
-          console.error('[AutoMode] Loop iteration error:', error);
+          logger.error('Loop iteration error', { error: (error as Error).message });
           await this.sleep(5000);
         }
       }
@@ -705,16 +710,20 @@ export class AutoModeService {
           projectPath,
         });
       } else {
-        console.error(`[AutoMode] Feature ${featureId} failed:`, error);
+        logger.error('Feature execution failed', {
+          featureId,
+          error: (error as Error).message,
+          stack: (error as Error).stack,
+        });
 
         // Ensure status update happens even if it fails
         try {
           await this.updateFeatureStatus(projectPath, featureId, 'backlog');
         } catch (statusError) {
-          console.error(
-            `[AutoMode] CRITICAL: Failed to update status for feature ${featureId}:`,
-            statusError
-          );
+          logger.error('CRITICAL: Failed to update feature status', {
+            featureId,
+            error: (statusError as Error).message,
+          });
           // Continue to emit error event even if status update fails
         }
 

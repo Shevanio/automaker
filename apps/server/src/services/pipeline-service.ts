@@ -9,7 +9,14 @@ import path from 'path';
 import { createLogger } from '@automaker/utils';
 import * as secureFs from '../lib/secure-fs.js';
 import { ensureAutomakerDir } from '@automaker/platform';
-import type { PipelineConfig, PipelineStep, FeatureStatusWithPipeline } from '@automaker/types';
+import type {
+  PipelineConfig,
+  PipelineStep,
+  FeatureStatusWithPipeline,
+  PipelineExecution,
+  PipelineStepExecution,
+  PipelineStepStatus,
+} from '@automaker/types';
 
 const logger = createLogger('PipelineService');
 
@@ -313,6 +320,228 @@ export class PipelineService {
       return null;
     }
     return status.replace('pipeline_', '');
+  }
+
+  /**
+   * Get the pipeline executions file path for a project
+   */
+  private getPipelineExecutionsPath(projectPath: string): string {
+    return path.join(projectPath, '.automaker', 'pipeline-executions.json');
+  }
+
+  /**
+   * Initialize a new pipeline execution for a feature
+   */
+  async initializeExecution(projectPath: string, featureId: string): Promise<PipelineExecution> {
+    const config = await this.getPipelineConfig(projectPath);
+
+    const execution: PipelineExecution = {
+      featureId,
+      projectPath,
+      status: 'in_progress',
+      currentStepIndex: 0,
+      steps: config.steps.map((step) => ({
+        stepId: step.id,
+        status: 'pending',
+        retryCount: 0,
+      })),
+      startedAt: new Date().toISOString(),
+    };
+
+    await this.saveExecution(projectPath, featureId, execution);
+    logger.info(`Pipeline execution initialized for feature ${featureId}`);
+
+    return execution;
+  }
+
+  /**
+   * Get pipeline execution state for a feature
+   */
+  async getExecution(projectPath: string, featureId: string): Promise<PipelineExecution | null> {
+    const executionsPath = this.getPipelineExecutionsPath(projectPath);
+
+    try {
+      const content = (await secureFs.readFile(executionsPath, 'utf-8')) as string;
+      const executions = JSON.parse(content) as Record<string, PipelineExecution>;
+      return executions[featureId] || null;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      logger.error(`Error reading pipeline executions:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Save pipeline execution state for a feature
+   */
+  async saveExecution(
+    projectPath: string,
+    featureId: string,
+    execution: PipelineExecution
+  ): Promise<void> {
+    await ensureAutomakerDir(projectPath);
+    const executionsPath = this.getPipelineExecutionsPath(projectPath);
+
+    // Read existing executions
+    let executions: Record<string, PipelineExecution> = {};
+    try {
+      const content = (await secureFs.readFile(executionsPath, 'utf-8')) as string;
+      executions = JSON.parse(content);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.warn(`Error reading executions, will overwrite:`, error);
+      }
+    }
+
+    // Update execution
+    executions[featureId] = execution;
+
+    // Save atomically
+    await atomicWriteJson(executionsPath, executions);
+  }
+
+  /**
+   * Update a step's execution status
+   */
+  async updateStepStatus(
+    projectPath: string,
+    featureId: string,
+    stepId: string,
+    status: PipelineStepStatus,
+    error?: string,
+    output?: string
+  ): Promise<void> {
+    const execution = await this.getExecution(projectPath, featureId);
+
+    if (!execution) {
+      throw new Error(`No pipeline execution found for feature ${featureId}`);
+    }
+
+    const stepExecution = execution.steps.find((s) => s.stepId === stepId);
+
+    if (!stepExecution) {
+      throw new Error(`Step ${stepId} not found in execution`);
+    }
+
+    const now = new Date().toISOString();
+
+    // Update step execution
+    stepExecution.status = status;
+    if (status === 'running' && !stepExecution.startedAt) {
+      stepExecution.startedAt = now;
+    }
+    if (status === 'success' || status === 'failed' || status === 'skipped') {
+      stepExecution.completedAt = now;
+    }
+    if (error) {
+      stepExecution.error = error;
+    }
+    if (output) {
+      stepExecution.output = output;
+    }
+
+    // Update overall execution status
+    const allCompleted = execution.steps.every(
+      (s) => s.status === 'success' || s.status === 'skipped'
+    );
+    const anyFailed = execution.steps.some((s) => s.status === 'failed');
+
+    if (allCompleted) {
+      execution.status = 'completed';
+      execution.completedAt = now;
+    } else if (anyFailed) {
+      execution.status = 'failed';
+      execution.completedAt = now;
+    }
+
+    await this.saveExecution(projectPath, featureId, execution);
+    logger.info(`Pipeline step ${stepId} status updated to ${status} for feature ${featureId}`);
+  }
+
+  /**
+   * Mark a step as started
+   */
+  async startStep(projectPath: string, featureId: string, stepId: string): Promise<void> {
+    await this.updateStepStatus(projectPath, featureId, stepId, 'running');
+  }
+
+  /**
+   * Mark a step as successful
+   */
+  async completeStep(
+    projectPath: string,
+    featureId: string,
+    stepId: string,
+    output?: string
+  ): Promise<void> {
+    await this.updateStepStatus(projectPath, featureId, stepId, 'success', undefined, output);
+  }
+
+  /**
+   * Mark a step as failed
+   */
+  async failStep(
+    projectPath: string,
+    featureId: string,
+    stepId: string,
+    error: string
+  ): Promise<void> {
+    await this.updateStepStatus(projectPath, featureId, stepId, 'failed', error);
+  }
+
+  /**
+   * Retry a failed step
+   */
+  async retryStep(projectPath: string, featureId: string, stepId: string): Promise<void> {
+    const execution = await this.getExecution(projectPath, featureId);
+
+    if (!execution) {
+      throw new Error(`No pipeline execution found for feature ${featureId}`);
+    }
+
+    const stepExecution = execution.steps.find((s) => s.stepId === stepId);
+
+    if (!stepExecution) {
+      throw new Error(`Step ${stepId} not found in execution`);
+    }
+
+    stepExecution.retryCount += 1;
+    stepExecution.status = 'pending';
+    stepExecution.error = undefined;
+    stepExecution.startedAt = undefined;
+    stepExecution.completedAt = undefined;
+
+    // Reset overall execution status
+    execution.status = 'in_progress';
+    execution.completedAt = undefined;
+
+    await this.saveExecution(projectPath, featureId, execution);
+    logger.info(
+      `Pipeline step ${stepId} retry #${stepExecution.retryCount} for feature ${featureId}`
+    );
+  }
+
+  /**
+   * Delete execution state for a feature
+   */
+  async deleteExecution(projectPath: string, featureId: string): Promise<void> {
+    const executionsPath = this.getPipelineExecutionsPath(projectPath);
+
+    try {
+      const content = (await secureFs.readFile(executionsPath, 'utf-8')) as string;
+      const executions = JSON.parse(content) as Record<string, PipelineExecution>;
+
+      delete executions[featureId];
+
+      await atomicWriteJson(executionsPath, executions);
+      logger.info(`Pipeline execution deleted for feature ${featureId}`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.error(`Error deleting execution:`, error);
+      }
+    }
   }
 }
 

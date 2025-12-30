@@ -19,6 +19,15 @@ import { createAddStepHandler } from './routes/add-step.js';
 import { createUpdateStepHandler } from './routes/update-step.js';
 import { createDeleteStepHandler } from './routes/delete-step.js';
 import { createReorderStepsHandler } from './routes/reorder-steps.js';
+import {
+  createGetExecutionHandler,
+  createInitializeExecutionHandler,
+  createStartStepHandler,
+  createCompleteStepHandler,
+  createFailStepHandler,
+  createRetryStepHandler,
+  createDeleteExecutionHandler,
+} from './routes/execution.js';
 
 /**
  * Create pipeline router with all endpoints
@@ -71,6 +80,39 @@ export function createPipelineRoutes(pipelineService: PipelineService): Router {
     '/steps/reorder',
     validatePathParams('projectPath'),
     createReorderStepsHandler(pipelineService)
+  );
+
+  // Pipeline execution tracking
+  router.get('/execution/:featureId', createGetExecutionHandler(pipelineService));
+  router.post(
+    '/execution/initialize',
+    validatePathParams('projectPath'),
+    createInitializeExecutionHandler(pipelineService)
+  );
+  router.post(
+    '/execution/start-step',
+    validatePathParams('projectPath'),
+    createStartStepHandler(pipelineService)
+  );
+  router.post(
+    '/execution/complete-step',
+    validatePathParams('projectPath'),
+    createCompleteStepHandler(pipelineService)
+  );
+  router.post(
+    '/execution/fail-step',
+    validatePathParams('projectPath'),
+    createFailStepHandler(pipelineService)
+  );
+  router.post(
+    '/execution/retry-step',
+    validatePathParams('projectPath'),
+    createRetryStepHandler(pipelineService)
+  );
+  router.post(
+    '/execution/delete',
+    validatePathParams('projectPath'),
+    createDeleteExecutionHandler(pipelineService)
   );
 
   return router;

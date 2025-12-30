@@ -55,13 +55,17 @@ import { createMCPRoutes } from './routes/mcp/index.js';
 import { MCPTestService } from './services/mcp-test-service.js';
 import { createPipelineRoutes } from './routes/pipeline/index.js';
 import { pipelineService } from './services/pipeline-service.js';
+import { getServerConfig } from './config/env.js';
 
 // Load environment variables
 dotenv.config();
 
-const PORT = parseInt(process.env.PORT || '3008', 10);
-const DATA_DIR = process.env.DATA_DIR || './data';
-const ENABLE_REQUEST_LOGGING = process.env.ENABLE_REQUEST_LOGGING !== 'false'; // Default to true
+// Load centralized configuration
+const config = getServerConfig();
+
+const PORT = config.port;
+const DATA_DIR = config.dataDir;
+const ENABLE_REQUEST_LOGGING = config.enableRequestLogging;
 
 // Check for required environment variables
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;

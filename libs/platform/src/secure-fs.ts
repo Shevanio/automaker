@@ -167,6 +167,8 @@ export async function readFile(
 
 /**
  * Wrapper around fs.writeFile that validates path first
+ * Automatically sets restrictive permissions (0600) on created files
+ * to prevent unauthorized access by other users/processes
  */
 export async function writeFile(
   filePath: string,
@@ -174,10 +176,26 @@ export async function writeFile(
   encoding?: BufferEncoding
 ): Promise<void> {
   const validatedPath = validatePath(filePath);
-  return executeWithRetry(
-    () => fs.writeFile(validatedPath, data, encoding),
-    `writeFile(${filePath})`
-  );
+
+  return executeWithRetry(async () => {
+    // Write the file
+    await fs.writeFile(validatedPath, data, encoding);
+
+    // Set restrictive permissions (0600 = rw-------)
+    // Owner can read/write, no permissions for group or others
+    // This prevents other users from reading sensitive data
+    try {
+      await fs.chmod(validatedPath, 0o600);
+    } catch (chmodError) {
+      // On Windows or some filesystems, chmod may not be supported
+      // Log warning but don't fail the write operation
+      // The file was successfully written, just couldn't set permissions
+      if (process.platform !== 'win32') {
+        // Only warn on non-Windows platforms where chmod should work
+        console.warn(`[SecureFS] Failed to set permissions on ${filePath}:`, chmodError);
+      }
+    }
+  }, `writeFile(${filePath})`);
 }
 
 /**

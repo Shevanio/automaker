@@ -601,6 +601,14 @@ export class AgentService {
     const metadata = await this.loadMetadata();
     if (!metadata[sessionId]) return false;
 
+    // Abort any running agent execution before deleting
+    const session = this.sessions.get(sessionId);
+    if (session?.abortController) {
+      console.log(`[AgentService] Aborting running agent for session ${sessionId} before deletion`);
+      session.abortController.abort();
+      session.abortController = null;
+    }
+
     delete metadata[sessionId];
     await this.saveMetadata(metadata);
 

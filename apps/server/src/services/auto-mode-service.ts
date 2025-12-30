@@ -386,6 +386,12 @@ export class AutoModeService {
     this.runAutoLoop().catch((error) => {
       console.error('[AutoMode] Loop error:', error);
       const errorInfo = classifyError(error);
+
+      // Ensure state is cleaned up on fatal error
+      this.autoLoopRunning = false;
+      this.autoLoopAbortController = null;
+      this.config = null;
+
       this.emitAutoModeEvent('auto_mode_error', {
         error: errorInfo.message,
         errorType: errorInfo.type,
@@ -394,53 +400,57 @@ export class AutoModeService {
   }
 
   private async runAutoLoop(): Promise<void> {
-    while (
-      this.autoLoopRunning &&
-      this.autoLoopAbortController &&
-      !this.autoLoopAbortController.signal.aborted
-    ) {
-      try {
-        // Check if we have capacity
-        if (this.runningFeatures.size >= (this.config?.maxConcurrency || 3)) {
+    try {
+      while (
+        this.autoLoopRunning &&
+        this.autoLoopAbortController &&
+        !this.autoLoopAbortController.signal.aborted
+      ) {
+        try {
+          // Check if we have capacity
+          if (this.runningFeatures.size >= (this.config?.maxConcurrency || 3)) {
+            await this.sleep(5000);
+            continue;
+          }
+
+          // Load pending features
+          const pendingFeatures = await this.loadPendingFeatures(this.config!.projectPath);
+
+          if (pendingFeatures.length === 0) {
+            this.emitAutoModeEvent('auto_mode_idle', {
+              message: 'No pending features - auto mode idle',
+              projectPath: this.config!.projectPath,
+            });
+            await this.sleep(10000);
+            continue;
+          }
+
+          // Find a feature not currently running
+          const nextFeature = pendingFeatures.find((f) => !this.runningFeatures.has(f.id));
+
+          if (nextFeature) {
+            // Start feature execution in background
+            this.executeFeature(
+              this.config!.projectPath,
+              nextFeature.id,
+              this.config!.useWorktrees,
+              true
+            ).catch((error) => {
+              console.error(`[AutoMode] Feature ${nextFeature.id} error:`, error);
+            });
+          }
+
+          await this.sleep(2000);
+        } catch (error) {
+          console.error('[AutoMode] Loop iteration error:', error);
           await this.sleep(5000);
-          continue;
         }
-
-        // Load pending features
-        const pendingFeatures = await this.loadPendingFeatures(this.config!.projectPath);
-
-        if (pendingFeatures.length === 0) {
-          this.emitAutoModeEvent('auto_mode_idle', {
-            message: 'No pending features - auto mode idle',
-            projectPath: this.config!.projectPath,
-          });
-          await this.sleep(10000);
-          continue;
-        }
-
-        // Find a feature not currently running
-        const nextFeature = pendingFeatures.find((f) => !this.runningFeatures.has(f.id));
-
-        if (nextFeature) {
-          // Start feature execution in background
-          this.executeFeature(
-            this.config!.projectPath,
-            nextFeature.id,
-            this.config!.useWorktrees,
-            true
-          ).catch((error) => {
-            console.error(`[AutoMode] Feature ${nextFeature.id} error:`, error);
-          });
-        }
-
-        await this.sleep(2000);
-      } catch (error) {
-        console.error('[AutoMode] Loop iteration error:', error);
-        await this.sleep(5000);
       }
+    } finally {
+      // Always clean up state when loop exits, whether normally or via error
+      this.autoLoopRunning = false;
+      console.log('[AutoMode] Auto loop stopped, state cleaned up');
     }
-
-    this.autoLoopRunning = false;
   }
 
   /**

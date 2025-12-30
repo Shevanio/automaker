@@ -13,6 +13,9 @@ import rateLimit from 'express-rate-limit';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('Server');
 
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths } from '@automaker/platform';
@@ -71,7 +74,7 @@ const ENABLE_REQUEST_LOGGING = config.enableRequestLogging;
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
 
 if (!hasAnthropicKey) {
-  console.warn(`
+  logger.warn(`
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║  ⚠️  WARNING: No Claude authentication configured                      ║
 ║                                                                       ║
@@ -84,7 +87,7 @@ if (!hasAnthropicKey) {
 ╚═══════════════════════════════════════════════════════════════════════╝
 `);
 } else {
-  console.log('[Server] ✓ ANTHROPIC_API_KEY detected (API key auth)');
+  logger.info('[Server] ✓ ANTHROPIC_API_KEY detected (API key auth)');
 }
 
 // Initialize security
@@ -135,13 +138,13 @@ function validateCorsOrigin(origin: string | string[] | undefined): string | str
   const validOrigins = origins.filter((o) => {
     const matches = ALLOWED_PATTERNS.some((pattern) => pattern.test(o));
     if (!matches) {
-      console.warn(`[Security] Rejecting invalid CORS origin: ${o}`);
+      logger.warn(`[Security] Rejecting invalid CORS origin: ${o}`);
     }
     return matches;
   });
 
   if (validOrigins.length === 0) {
-    console.warn('[Security] No valid CORS origins found in CORS_ORIGIN env var, using defaults');
+    logger.warn('[Security] No valid CORS origins found in CORS_ORIGIN env var, using defaults');
     return DEFAULT_CORS_ORIGINS;
   }
 
@@ -149,7 +152,7 @@ function validateCorsOrigin(origin: string | string[] | undefined): string | str
 }
 
 const corsOrigin = validateCorsOrigin(process.env.CORS_ORIGIN);
-console.log('[Security] CORS origins configured:', corsOrigin);
+logger.info('[Security] CORS origins configured:', corsOrigin);
 
 app.use(
   cors({
@@ -196,7 +199,7 @@ const mcpTestService = new MCPTestService(settingsService);
 // Initialize services
 (async () => {
   await agentService.initialize();
-  console.log('[Server] Agent service initialized');
+  logger.info('[Server] Agent service initialized');
 })();
 
 // Run stale validation cleanup every hour to prevent memory leaks from crashed validations
@@ -204,7 +207,7 @@ const VALIDATION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 setInterval(() => {
   const cleaned = cleanupStaleValidations();
   if (cleaned > 0) {
-    console.log(`[Server] Cleaned up ${cleaned} stale validation entries`);
+    logger.info(`[Server] Cleaned up ${cleaned} stale validation entries`);
   }
 }, VALIDATION_CLEANUP_INTERVAL_MS);
 
@@ -273,7 +276,7 @@ server.on('upgrade', (request, socket, head) => {
 
 // Events WebSocket connection handler
 wss.on('connection', (ws: WebSocket) => {
-  console.log('[WebSocket] Client connected, ready state:', ws.readyState);
+  logger.info('[WebSocket] Client connected, ready state:', ws.readyState);
 
   // Track if already unsubscribed to prevent double-cleanup
   let hasUnsubscribed = false;
@@ -286,7 +289,7 @@ wss.on('connection', (ws: WebSocket) => {
 
   // Subscribe to all events and forward to this client
   const unsubscribe = events.subscribe((type, payload) => {
-    console.log('[WebSocket] Event received:', {
+    logger.info('[WebSocket] Event received:', {
       type,
       hasPayload: !!payload,
       payloadKeys: payload ? Object.keys(payload) : [],
@@ -297,21 +300,21 @@ wss.on('connection', (ws: WebSocket) => {
     if (ws.readyState === WebSocket.OPEN) {
       try {
         const message = JSON.stringify({ type, payload });
-        console.log('[WebSocket] Sending event to client:', {
+        logger.info('[WebSocket] Sending event to client:', {
           type,
           messageLength: message.length,
           sessionId: (payload as any)?.sessionId,
         });
         ws.send(message);
       } catch (error) {
-        console.error('[WebSocket] ERROR sending message:', error);
+        logger.error('[WebSocket] ERROR sending message:', error);
         // Clean up subscription if send fails
         safeUnsubscribe();
         // Close the connection on send error
         ws.close();
       }
     } else {
-      console.log(
+      logger.info(
         '[WebSocket] WARNING: Cannot send event, WebSocket not open. ReadyState:',
         ws.readyState
       );
@@ -321,12 +324,12 @@ wss.on('connection', (ws: WebSocket) => {
   });
 
   ws.on('close', () => {
-    console.log('[WebSocket] Client disconnected');
+    logger.info('[WebSocket] Client disconnected');
     safeUnsubscribe();
   });
 
   ws.on('error', (error) => {
-    console.error('[WebSocket] ERROR:', error);
+    logger.error('[WebSocket] ERROR:', error);
     safeUnsubscribe();
   });
 });
@@ -353,24 +356,24 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
   const sessionId = url.searchParams.get('sessionId');
   const token = url.searchParams.get('token');
 
-  console.log(`[Terminal WS] Connection attempt for session: ${sessionId}`);
+  logger.info(`[Terminal WS] Connection attempt for session: ${sessionId}`);
 
   // Check if terminal is enabled
   if (!isTerminalEnabled()) {
-    console.log('[Terminal WS] Terminal is disabled');
+    logger.info('[Terminal WS] Terminal is disabled');
     ws.close(4003, 'Terminal access is disabled');
     return;
   }
 
   // Validate token if password is required
   if (isTerminalPasswordRequired() && !validateTerminalToken(token || undefined)) {
-    console.log('[Terminal WS] Invalid or missing token');
+    logger.info('[Terminal WS] Invalid or missing token');
     ws.close(4001, 'Authentication required');
     return;
   }
 
   if (!sessionId) {
-    console.log('[Terminal WS] No session ID provided');
+    logger.info('[Terminal WS] No session ID provided');
     ws.close(4002, 'Session ID required');
     return;
   }
@@ -378,12 +381,12 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
   // Check if session exists
   const session = terminalService.getSession(sessionId);
   if (!session) {
-    console.log(`[Terminal WS] Session ${sessionId} not found`);
+    logger.info(`[Terminal WS] Session ${sessionId} not found`);
     ws.close(4004, 'Session not found');
     return;
   }
 
-  console.log(`[Terminal WS] Client connected to session ${sessionId}`);
+  logger.info(`[Terminal WS] Client connected to session ${sessionId}`);
 
   // Track this connection
   if (!terminalConnections.has(sessionId)) {
@@ -499,15 +502,15 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
           break;
 
         default:
-          console.warn(`[Terminal WS] Unknown message type: ${msg.type}`);
+          logger.warn(`[Terminal WS] Unknown message type: ${msg.type}`);
       }
     } catch (error) {
-      console.error('[Terminal WS] Error processing message:', error);
+      logger.error('[Terminal WS] Error processing message:', error);
     }
   });
 
   ws.on('close', () => {
-    console.log(`[Terminal WS] Client disconnected from session ${sessionId}`);
+    logger.info(`[Terminal WS] Client disconnected from session ${sessionId}`);
     unsubscribeData();
     unsubscribeExit();
 
@@ -526,7 +529,7 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
   });
 
   ws.on('error', (error) => {
-    console.error(`[Terminal WS] Error on session ${sessionId}:`, error);
+    logger.error(`[Terminal WS] Error on session ${sessionId}:`, error);
     unsubscribeData();
     unsubscribeExit();
   });
@@ -541,7 +544,7 @@ const startServer = (port: number) => {
         : 'enabled'
       : 'disabled';
     const portStr = port.toString().padEnd(4);
-    console.log(`
+    logger.info(`
 ╔═══════════════════════════════════════════════════════╗
 ║           Automaker Backend Server                    ║
 ╠═══════════════════════════════════════════════════════╣
@@ -556,7 +559,7 @@ const startServer = (port: number) => {
 
   server.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
-      console.error(`
+      logger.error(`
 ╔═══════════════════════════════════════════════════════╗
 ║  ❌ ERROR: Port ${port} is already in use              ║
 ╠═══════════════════════════════════════════════════════╣
@@ -576,7 +579,7 @@ const startServer = (port: number) => {
 `);
       process.exit(1);
     } else {
-      console.error('[Server] Error starting server:', error);
+      logger.error('[Server] Error starting server:', error);
       process.exit(1);
     }
   });
@@ -586,19 +589,19 @@ startServer(PORT);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down...');
+  logger.info('SIGTERM received, shutting down...');
   terminalService.cleanup();
   server.close(() => {
-    console.log('Server closed');
+    logger.info('Server closed');
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down...');
+  logger.info('SIGINT received, shutting down...');
   terminalService.cleanup();
   server.close(() => {
-    console.log('Server closed');
+    logger.info('Server closed');
     process.exit(0);
   });
 });

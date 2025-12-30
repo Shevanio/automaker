@@ -11,6 +11,9 @@ import { spawn, execSync, type ChildProcess } from 'child_process';
 import * as secureFs from '../lib/secure-fs.js';
 import path from 'path';
 import net from 'net';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('DevServer');
 
 export interface DevServerInfo {
   worktreePath: string;
@@ -58,7 +61,7 @@ class DevServerService {
   private killProcessOnPort(port: number): void {
     // SECURITY: Validate port is a safe integer to prevent command injection
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      console.warn(`[DevServerService] Invalid port number: ${port}`);
+      logger.warn(`[DevServerService] Invalid port number: ${port}`);
       return;
     }
 
@@ -78,12 +81,12 @@ class DevServerService {
         for (const pid of pids) {
           // SECURITY: Validate PID is numeric to prevent command injection
           if (!/^\d+$/.test(pid)) {
-            console.warn(`[DevServerService] Invalid PID format: ${pid}`);
+            logger.warn(`[DevServerService] Invalid PID format: ${pid}`);
             continue;
           }
           try {
             execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
-            console.log(`[DevServerService] Killed process ${pid} on port ${port}`);
+            logger.info(`[DevServerService] Killed process ${pid} on port ${port}`);
           } catch {
             // Process may have already exited
           }
@@ -96,12 +99,12 @@ class DevServerService {
           for (const pid of pids) {
             // SECURITY: Validate PID is numeric to prevent command injection
             if (!/^\d+$/.test(pid)) {
-              console.warn(`[DevServerService] Invalid PID format: ${pid}`);
+              logger.warn(`[DevServerService] Invalid PID format: ${pid}`);
               continue;
             }
             try {
               execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
-              console.log(`[DevServerService] Killed process ${pid} on port ${port}`);
+              logger.info(`[DevServerService] Killed process ${pid} on port ${port}`);
             } catch {
               // Process may have already exited
             }
@@ -112,7 +115,7 @@ class DevServerService {
       }
     } catch (error) {
       // Ignore errors - port might not have any process
-      console.log(`[DevServerService] No process to kill on port ${port}`);
+      logger.info(`[DevServerService] No process to kill on port ${port}`);
     }
   }
 
@@ -270,9 +273,9 @@ class DevServerService {
     // Small delay to ensure related ports are freed
     await new Promise((resolve) => setTimeout(resolve, SERVER_STARTUP_DELAY_MS));
 
-    console.log(`[DevServerService] Starting dev server on port ${port}`);
-    console.log(`[DevServerService] Working directory (cwd): ${worktreePath}`);
-    console.log(
+    logger.info(`[DevServerService] Starting dev server on port ${port}`);
+    logger.info(`[DevServerService] Working directory (cwd): ${worktreePath}`);
+    logger.info(
       `[DevServerService] Command: ${devCommand.cmd} ${devCommand.args.join(' ')} with PORT=${port}`
     );
 
@@ -295,26 +298,26 @@ class DevServerService {
     // Log output for debugging
     if (devProcess.stdout) {
       devProcess.stdout.on('data', (data: Buffer) => {
-        console.log(`[DevServer:${port}] ${data.toString().trim()}`);
+        logger.info(`[DevServer:${port}] ${data.toString().trim()}`);
       });
     }
 
     if (devProcess.stderr) {
       devProcess.stderr.on('data', (data: Buffer) => {
         const msg = data.toString().trim();
-        console.error(`[DevServer:${port}] ${msg}`);
+        logger.error(`[DevServer:${port}] ${msg}`);
       });
     }
 
     devProcess.on('error', (error) => {
-      console.error(`[DevServerService] Process error:`, error);
+      logger.error(`[DevServerService] Process error:`, error);
       status.error = error.message;
       this.allocatedPorts.delete(port);
       this.runningServers.delete(worktreePath);
     });
 
     devProcess.on('exit', (code) => {
-      console.log(`[DevServerService] Process for ${worktreePath} exited with code ${code}`);
+      logger.info(`[DevServerService] Process for ${worktreePath} exited with code ${code}`);
       status.exited = true;
       this.allocatedPorts.delete(port);
       this.runningServers.delete(worktreePath);
@@ -371,7 +374,7 @@ class DevServerService {
     // If we don't have a record of this server, it may have crashed/exited on its own
     // Return success so the frontend can clear its state
     if (!server) {
-      console.log(
+      logger.info(
         `[DevServerService] No server record for ${worktreePath}, may have already stopped`
       );
       return {
@@ -383,7 +386,7 @@ class DevServerService {
       };
     }
 
-    console.log(`[DevServerService] Stopping dev server for ${worktreePath}`);
+    logger.info(`[DevServerService] Stopping dev server for ${worktreePath}`);
 
     // Kill the process
     if (server.process && !server.process.killed) {
@@ -453,7 +456,7 @@ class DevServerService {
    * Stop all running dev servers (for cleanup)
    */
   async stopAll(): Promise<void> {
-    console.log(`[DevServerService] Stopping all ${this.runningServers.size} dev servers`);
+    logger.info(`[DevServerService] Stopping all ${this.runningServers.size} dev servers`);
 
     for (const [worktreePath] of this.runningServers) {
       await this.stopDevServer(worktreePath);

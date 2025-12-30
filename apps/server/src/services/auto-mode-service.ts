@@ -807,14 +807,38 @@ export class AutoModeService {
   }
 
   /**
+   * Sanitize user-provided text to prevent prompt injection attacks
+   * Removes or escapes patterns that could manipulate the AI's behavior
+   */
+  private sanitizeUserInput(text: string): string {
+    if (!text) return '';
+
+    // Remove null bytes
+    let sanitized = text.replace(/\0/g, '');
+
+    // Remove control characters except newlines and tabs
+    sanitized = sanitized.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+
+    // Limit consecutive newlines to prevent context flooding
+    sanitized = sanitized.replace(/\n{5,}/g, '\n\n\n\n');
+
+    return sanitized.trim();
+  }
+
+  /**
    * Build the prompt for a pipeline step
+   * SECURITY: Sanitizes user-provided instructions to prevent prompt injection
    */
   private buildPipelineStepPrompt(
     step: PipelineStep,
     feature: Feature,
     previousContext: string
   ): string {
-    let prompt = `## Pipeline Step: ${step.name}
+    // SECURITY: Sanitize user-provided inputs
+    const sanitizedInstructions = this.sanitizeUserInput(step.instructions);
+    const sanitizedName = this.sanitizeUserInput(step.name);
+
+    let prompt = `## Pipeline Step: ${sanitizedName}
 
 This is an automated pipeline step following the initial feature implementation.
 
@@ -833,7 +857,7 @@ ${previousContext}
     }
 
     prompt += `### Pipeline Step Instructions
-${step.instructions}
+${sanitizedInstructions}
 
 ### Task
 Complete the pipeline step instructions above. Review the previous work and apply the required changes or actions.`;
@@ -1014,8 +1038,27 @@ Address the follow-up instructions above. Review the previous work and make the 
 
         for (const imagePath of imagePaths) {
           try {
-            // Get the filename from the path
+            // SECURITY: Validate filename to prevent path traversal
             const filename = path.basename(imagePath);
+
+            // Reject filenames with path traversal patterns
+            if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+              console.warn(
+                `[AutoMode] SECURITY: Rejecting unsafe image filename: ${filename} from path: ${imagePath}`
+              );
+              continue;
+            }
+
+            // Only allow common image extensions
+            const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+            const ext = path.extname(filename).toLowerCase();
+            if (!allowedExtensions.includes(ext)) {
+              console.warn(
+                `[AutoMode] SECURITY: Rejecting image with disallowed extension: ${filename} (${ext})`
+              );
+              continue;
+            }
+
             const destPath = path.join(featureImagesDir, filename);
 
             // Copy the image

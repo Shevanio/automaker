@@ -23,8 +23,20 @@ let dataDirectory: string | null = null;
 
 /**
  * Initialize security settings from environment variables
- * - ALLOWED_ROOT_DIRECTORY: main security boundary
- * - DATA_DIR: appData exception, always allowed
+ *
+ * Loads and validates security configuration from environment:
+ * - ALLOWED_ROOT_DIRECTORY: main security boundary for file operations
+ * - DATA_DIR: appData exception, always allowed for settings/credentials
+ *
+ * @example
+ * ```typescript
+ * // Set environment variables first
+ * process.env.ALLOWED_ROOT_DIRECTORY = '/home/user/projects';
+ * process.env.DATA_DIR = '/home/user/.automaker';
+ *
+ * // Initialize security
+ * initAllowedPaths();
+ * ```
  */
 export function initAllowedPaths(): void {
   // Load ALLOWED_ROOT_DIRECTORY
@@ -46,10 +58,21 @@ export function initAllowedPaths(): void {
 
 /**
  * Check if a path is allowed based on ALLOWED_ROOT_DIRECTORY
+ *
  * Returns true if:
  * - Path is within ALLOWED_ROOT_DIRECTORY, OR
  * - Path is within DATA_DIR (appData exception), OR
  * - No restrictions are configured (backward compatibility)
+ *
+ * @param filePath - Path to check (can be relative or absolute)
+ * @returns true if path is allowed, false otherwise
+ * @example
+ * ```typescript
+ * if (isPathAllowed('/home/user/project/file.txt')) {
+ *   // Safe to access this file
+ *   await fs.readFile('/home/user/project/file.txt');
+ * }
+ * ```
  */
 export function isPathAllowed(filePath: string): boolean {
   const resolvedPath = path.resolve(filePath);
@@ -76,7 +99,21 @@ export function isPathAllowed(filePath: string): boolean {
 
 /**
  * Validate a path - resolves it and checks permissions
- * Throws PathNotAllowedError if path is not allowed
+ *
+ * @param filePath - Path to validate (can be relative or absolute)
+ * @returns Resolved absolute path if allowed
+ * @throws PathNotAllowedError if path is not within allowed directories
+ * @example
+ * ```typescript
+ * try {
+ *   const safePath = validatePath('../../../etc/passwd');
+ *   // This will throw if path is outside allowed directories
+ * } catch (error) {
+ *   if (error instanceof PathNotAllowedError) {
+ *     console.error('Access denied:', error.message);
+ *   }
+ * }
+ * ```
  */
 export function validatePath(filePath: string): string {
   const resolvedPath = path.resolve(filePath);
@@ -90,7 +127,21 @@ export function validatePath(filePath: string): string {
 
 /**
  * Check if a path is within a directory, with protection against path traversal
- * Returns true only if resolvedPath is within directoryPath
+ *
+ * Uses path.relative() to detect ".." traversal attempts. Returns true only
+ * if resolvedPath is actually within directoryPath.
+ *
+ * @param resolvedPath - Absolute path to check
+ * @param directoryPath - Absolute directory path to check against
+ * @returns true if resolvedPath is within directoryPath, false otherwise
+ * @example
+ * ```typescript
+ * isPathWithinDirectory('/home/user/projects/app/file.txt', '/home/user/projects');
+ * // Returns: true
+ *
+ * isPathWithinDirectory('/etc/passwd', '/home/user/projects');
+ * // Returns: false
+ * ```
  */
 export function isPathWithinDirectory(resolvedPath: string, directoryPath: string): boolean {
   // Get the relative path from directory to the target
@@ -104,6 +155,15 @@ export function isPathWithinDirectory(resolvedPath: string, directoryPath: strin
 
 /**
  * Get the configured allowed root directory
+ *
+ * @returns Absolute path to allowed root directory, or null if not configured
+ * @example
+ * ```typescript
+ * const rootDir = getAllowedRootDirectory();
+ * if (rootDir) {
+ *   console.log(`File operations restricted to: ${rootDir}`);
+ * }
+ * ```
  */
 export function getAllowedRootDirectory(): string | null {
   return allowedRootDirectory;
@@ -111,6 +171,15 @@ export function getAllowedRootDirectory(): string | null {
 
 /**
  * Get the configured data directory
+ *
+ * @returns Absolute path to data directory (always allowed), or null if not configured
+ * @example
+ * ```typescript
+ * const dataDir = getDataDirectory();
+ * if (dataDir) {
+ *   console.log(`Settings stored in: ${dataDir}`);
+ * }
+ * ```
  */
 export function getDataDirectory(): string | null {
   return dataDirectory;
@@ -118,6 +187,14 @@ export function getDataDirectory(): string | null {
 
 /**
  * Get list of allowed paths (for debugging)
+ *
+ * @returns Array of absolute paths that are allowed for file operations
+ * @example
+ * ```typescript
+ * const allowed = getAllowedPaths();
+ * console.log('Allowed paths:', allowed);
+ * // Output: ['/home/user/projects', '/home/user/.automaker']
+ * ```
  */
 export function getAllowedPaths(): string[] {
   const paths: string[] = [];

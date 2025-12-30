@@ -54,8 +54,28 @@ export function isAuthenticationError(errorMessage: string): boolean {
 /**
  * Classify an error into a specific type
  *
- * @param error - The error to classify
- * @returns Classified error information
+ * Analyzes error message and properties to categorize into:
+ * - authentication: API key or auth failures
+ * - abort: AbortController/AbortError
+ * - cancellation: User-initiated cancellation
+ * - execution: Runtime execution errors
+ * - unknown: Unclassified errors
+ *
+ * @param error - The error to classify (Error object or any value)
+ * @returns Classified error information with type and message
+ * @example
+ * ```typescript
+ * try {
+ *   await someOperation();
+ * } catch (error) {
+ *   const { type, message } = classifyError(error);
+ *   if (type === 'authentication') {
+ *     console.error('Authentication failed:', message);
+ *   } else if (type === 'cancellation') {
+ *     console.log('Operation cancelled by user');
+ *   }
+ * }
+ * ```
  */
 export function classifyError(error: unknown): ErrorInfo {
   const message = error instanceof Error ? error.message : String(error || 'Unknown error');

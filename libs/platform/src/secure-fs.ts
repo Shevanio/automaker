@@ -42,7 +42,16 @@ let fsLimit = pLimit(config.maxConcurrency);
 
 /**
  * Configure the file operation throttling settings
+ *
  * @param newConfig - Partial configuration to merge with defaults
+ * @throws Error if attempting to change maxConcurrency with operations in flight
+ * @example
+ * ```typescript
+ * configureThrottling({
+ *   maxConcurrency: 50,  // Reduce from default 100
+ *   maxRetries: 5        // Increase retry attempts
+ * });
+ * ```
  */
 export function configureThrottling(newConfig: Partial<ThrottleConfig>): void {
   const newConcurrency = newConfig.maxConcurrency;
@@ -61,6 +70,13 @@ export function configureThrottling(newConfig: Partial<ThrottleConfig>): void {
 
 /**
  * Get the current throttling configuration
+ *
+ * @returns Read-only copy of current throttle configuration
+ * @example
+ * ```typescript
+ * const config = getThrottlingConfig();
+ * console.log(`Max concurrent operations: ${config.maxConcurrency}`);
+ * ```
  */
 export function getThrottlingConfig(): Readonly<ThrottleConfig> {
   return { ...config };
@@ -68,6 +84,15 @@ export function getThrottlingConfig(): Readonly<ThrottleConfig> {
 
 /**
  * Get the number of pending operations in the queue
+ *
+ * @returns Number of operations waiting to execute
+ * @example
+ * ```typescript
+ * const pending = getPendingOperations();
+ * if (pending > 50) {
+ *   console.warn('High queue depth:', pending);
+ * }
+ * ```
  */
 export function getPendingOperations(): number {
   return fsLimit.pendingCount;
@@ -75,6 +100,13 @@ export function getPendingOperations(): number {
 
 /**
  * Get the number of active operations currently running
+ *
+ * @returns Number of operations currently executing
+ * @example
+ * ```typescript
+ * const active = getActiveOperations();
+ * console.log(`Currently processing ${active} file operations`);
+ * ```
  */
 export function getActiveOperations(): number {
   return fsLimit.activeCount;
@@ -143,6 +175,25 @@ async function executeWithRetry<T>(operation: () => Promise<T>, operationName: s
 
 /**
  * Wrapper around fs.access that validates path first
+ *
+ * Checks file existence and permissions with automatic path validation
+ * and retry logic for file descriptor errors.
+ *
+ * @param filePath - Path to check (validated against security policy)
+ * @param mode - Optional access mode (fs.constants.R_OK, W_OK, X_OK)
+ * @throws PathNotAllowedError if path is outside allowed directories
+ * @throws Error if file doesn't exist or permissions are insufficient
+ * @example
+ * ```typescript
+ * import { constants } from 'fs';
+ *
+ * try {
+ *   await access('/path/to/file.txt', constants.R_OK | constants.W_OK);
+ *   console.log('File is readable and writable');
+ * } catch (error) {
+ *   console.error('Access denied');
+ * }
+ * ```
  */
 export async function access(filePath: string, mode?: number): Promise<void> {
   const validatedPath = validatePath(filePath);
@@ -151,6 +202,23 @@ export async function access(filePath: string, mode?: number): Promise<void> {
 
 /**
  * Wrapper around fs.readFile that validates path first
+ *
+ * Reads file contents with automatic path validation, throttling,
+ * and retry logic for file descriptor errors.
+ *
+ * @param filePath - Path to file (validated against security policy)
+ * @param encoding - Optional encoding ('utf-8', 'base64', etc.). If omitted, returns Buffer
+ * @returns File contents as string (if encoding specified) or Buffer
+ * @throws PathNotAllowedError if path is outside allowed directories
+ * @throws Error if file doesn't exist or can't be read
+ * @example
+ * ```typescript
+ * // Read as string
+ * const text = await readFile('/path/to/file.txt', 'utf-8');
+ *
+ * // Read as buffer
+ * const buffer = await readFile('/path/to/image.png');
+ * ```
  */
 export async function readFile(
   filePath: string,
@@ -167,8 +235,25 @@ export async function readFile(
 
 /**
  * Wrapper around fs.writeFile that validates path first
- * Automatically sets restrictive permissions (0600) on created files
- * to prevent unauthorized access by other users/processes
+ *
+ * Writes data to file with automatic path validation, throttling,
+ * and restrictive permissions (0600) for security.
+ *
+ * @param filePath - Path to file (validated against security policy)
+ * @param data - Data to write (string or Buffer)
+ * @param encoding - Optional encoding when data is string (default: 'utf-8')
+ * @throws PathNotAllowedError if path is outside allowed directories
+ * @throws Error if file can't be written
+ * @example
+ * ```typescript
+ * // Write text file
+ * await writeFile('/path/to/file.txt', 'Hello world', 'utf-8');
+ *
+ * // Write binary data
+ * await writeFile('/path/to/data.bin', buffer);
+ *
+ * // File created with 0600 permissions (owner read/write only)
+ * ```
  */
 export async function writeFile(
   filePath: string,
@@ -200,6 +285,15 @@ export async function writeFile(
 
 /**
  * Wrapper around fs.mkdir that validates path first
+ *
+ * @param dirPath - Path to directory (validated against security policy)
+ * @param options - Options object with recursive flag and mode
+ * @returns Path to created directory (when recursive=true), otherwise undefined
+ * @throws PathNotAllowedError if path is outside allowed directories
+ * @example
+ * ```typescript
+ * await mkdir('/path/to/new/dir', { recursive: true });
+ * ```
  */
 export async function mkdir(
   dirPath: string,

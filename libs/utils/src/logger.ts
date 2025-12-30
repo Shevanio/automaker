@@ -28,7 +28,24 @@ if (envLogLevel && LOG_LEVEL_NAMES[envLogLevel] !== undefined) {
 
 /**
  * Create a logger instance with a context prefix
- * All log output is automatically sanitized to prevent sensitive data leakage
+ *
+ * All log output is automatically sanitized to prevent sensitive data leakage.
+ * Respects LOG_LEVEL environment variable (error, warn, info, debug).
+ *
+ * @param context - Context name to prefix all log messages (e.g., 'Terminal', 'AutoMode')
+ * @returns Logger object with error, warn, info, debug methods
+ * @example
+ * ```typescript
+ * const logger = createLogger('MyService');
+ *
+ * logger.info('Server started');
+ * logger.warn('High memory usage');
+ * logger.error('Failed to connect:', error);
+ * logger.debug('Request details:', { method: 'GET', url: '/api' });
+ *
+ * // Sensitive data is automatically redacted
+ * logger.info('API key:', 'sk-ant-abc123'); // Logs: "API key: [REDACTED]"
+ * ```
  */
 export function createLogger(context: string) {
   const prefix = `[${context}]`;
@@ -66,6 +83,15 @@ export function createLogger(context: string) {
 
 /**
  * Get the current log level
+ *
+ * @returns Current log level (ERROR=0, WARN=1, INFO=2, DEBUG=3)
+ * @example
+ * ```typescript
+ * const level = getLogLevel();
+ * if (level >= LogLevel.DEBUG) {
+ *   console.log('Debug logging enabled');
+ * }
+ * ```
  */
 export function getLogLevel(): LogLevel {
   return currentLogLevel;
@@ -73,6 +99,16 @@ export function getLogLevel(): LogLevel {
 
 /**
  * Set the log level programmatically (useful for testing)
+ *
+ * @param level - Log level to set (ERROR=0, WARN=1, INFO=2, DEBUG=3)
+ * @example
+ * ```typescript
+ * // Enable debug logging
+ * setLogLevel(LogLevel.DEBUG);
+ *
+ * // Silence all but errors
+ * setLogLevel(LogLevel.ERROR);
+ * ```
  */
 export function setLogLevel(level: LogLevel): void {
   currentLogLevel = level;

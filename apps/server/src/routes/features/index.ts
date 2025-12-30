@@ -12,6 +12,8 @@ import { createUpdateHandler } from './routes/update.js';
 import { createDeleteHandler } from './routes/delete.js';
 import { createAgentOutputHandler } from './routes/agent-output.js';
 import { createGenerateTitleHandler } from './routes/generate-title.js';
+import { rollbackFeature } from './rollback.js';
+import { getFeatureSnapshot } from './snapshot.js';
 
 export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
   const router = Router();
@@ -23,6 +25,10 @@ export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
   router.post('/delete', validatePathParams('projectPath'), createDeleteHandler(featureLoader));
   router.post('/agent-output', createAgentOutputHandler(featureLoader));
   router.post('/generate-title', createGenerateTitleHandler());
+
+  // Snapshot and rollback routes
+  router.post('/rollback', validatePathParams('projectPath'), rollbackFeature);
+  router.get('/:featureId/snapshot', getFeatureSnapshot);
 
   return router;
 }

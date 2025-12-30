@@ -40,6 +40,7 @@ import {
 import { FeatureLoader } from './feature-loader.js';
 import type { SettingsService } from './settings-service.js';
 import { pipelineService, PipelineService } from './pipeline-service.js';
+import { getSnapshotService } from './snapshot-service.js';
 import {
   getAutoLoadClaudeMdSetting,
   getEnableSandboxModeSetting,
@@ -606,6 +607,18 @@ export class AutoModeService {
       tempRunningFeature.worktreePath = worktreePath;
       tempRunningFeature.branchName = branchName ?? null;
 
+      // Create snapshot before execution (for rollback functionality)
+      if (branchName) {
+        try {
+          const snapshotService = getSnapshotService();
+          await snapshotService.createSnapshot(projectPath, featureId, workDir, branchName);
+          logger.info(`Snapshot created for feature ${featureId}`);
+        } catch (error) {
+          logger.warn(`Failed to create snapshot for feature ${featureId}:`, error);
+          // Don't fail execution if snapshot creation fails
+        }
+      }
+
       // Update feature status to in_progress
       await this.updateFeatureStatus(projectPath, featureId, 'in_progress');
 
@@ -699,6 +712,14 @@ export class AutoModeService {
       // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+
+      // Mark snapshot as completed (successful execution)
+      try {
+        const snapshotService = getSnapshotService();
+        await snapshotService.markCompleted(projectPath, featureId);
+      } catch (error) {
+        logger.warn(`Failed to mark snapshot as completed for ${featureId}:`, error);
+      }
 
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,

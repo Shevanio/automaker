@@ -34,15 +34,29 @@ export function getMimeTypeForImage(imagePath: string): string {
   return IMAGE_MIME_TYPES[ext] || 'image/png';
 }
 
+// SECURITY: Maximum allowed image size (10MB)
+// Prevents DoS attacks via large image uploads and excessive memory usage
+const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
 /**
  * Read an image file and convert to base64 with metadata
  *
  * @param imagePath - Path to the image file
  * @returns Promise resolving to image data with base64 encoding
- * @throws Error if file cannot be read
+ * @throws Error if file cannot be read or exceeds size limit
  */
 export async function readImageAsBase64(imagePath: string): Promise<ImageData> {
   const imageBuffer = (await secureFs.readFile(imagePath)) as Buffer;
+
+  // SECURITY: Validate image size to prevent DoS and memory exhaustion
+  if (imageBuffer.length > MAX_IMAGE_SIZE_BYTES) {
+    const sizeMB = (imageBuffer.length / (1024 * 1024)).toFixed(2);
+    const maxMB = (MAX_IMAGE_SIZE_BYTES / (1024 * 1024)).toFixed(0);
+    throw new Error(
+      `Image file "${path.basename(imagePath)}" is too large (${sizeMB}MB). Maximum allowed size is ${maxMB}MB.`
+    );
+  }
+
   const base64Data = imageBuffer.toString('base64');
   const mimeType = getMimeTypeForImage(imagePath);
 

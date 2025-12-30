@@ -223,6 +223,13 @@ After completing all tasks in a phase, output:
 This allows real-time progress tracking during implementation.`,
 };
 
+// Pre-compiled regex patterns for task parsing (PERF optimization)
+const REGEX_TASKS_BLOCK = /```tasks\s*([\s\S]*?)```/;
+const REGEX_TASK_LINE_FALLBACK = /- \[ \] T\d{3}:.*$/gm;
+const REGEX_PHASE_HEADER = /^##\s*(.+)$/;
+const REGEX_TASK_WITH_FILE = /- \[ \] (T\d{3}):\s*([^|]+)(?:\|\s*File:\s*(.+))?$/;
+const REGEX_TASK_SIMPLE = /- \[ \] (T\d{3}):\s*(.+)$/;
+
 /**
  * Parse tasks from generated spec content
  * Looks for the ```tasks code block and extracts task lines
@@ -232,10 +239,10 @@ function parseTasksFromSpec(specContent: string): ParsedTask[] {
   const tasks: ParsedTask[] = [];
 
   // Extract content within ```tasks ... ``` block
-  const tasksBlockMatch = specContent.match(/```tasks\s*([\s\S]*?)```/);
+  const tasksBlockMatch = specContent.match(REGEX_TASKS_BLOCK);
   if (!tasksBlockMatch) {
     // Try fallback: look for task lines anywhere in content
-    const taskLines = specContent.match(/- \[ \] T\d{3}:.*$/gm);
+    const taskLines = specContent.match(REGEX_TASK_LINE_FALLBACK);
     if (!taskLines) {
       return tasks;
     }
@@ -259,7 +266,7 @@ function parseTasksFromSpec(specContent: string): ParsedTask[] {
     const trimmedLine = line.trim();
 
     // Check for phase header (e.g., "## Phase 1: Foundation")
-    const phaseMatch = trimmedLine.match(/^##\s*(.+)$/);
+    const phaseMatch = trimmedLine.match(REGEX_PHASE_HEADER);
     if (phaseMatch) {
       currentPhase = phaseMatch[1].trim();
       continue;
@@ -283,10 +290,10 @@ function parseTasksFromSpec(specContent: string): ParsedTask[] {
  */
 function parseTaskLine(line: string, currentPhase?: string): ParsedTask | null {
   // Match pattern: - [ ] T###: Description | File: path
-  const taskMatch = line.match(/- \[ \] (T\d{3}):\s*([^|]+)(?:\|\s*File:\s*(.+))?$/);
+  const taskMatch = line.match(REGEX_TASK_WITH_FILE);
   if (!taskMatch) {
     // Try simpler pattern without file
-    const simpleMatch = line.match(/- \[ \] (T\d{3}):\s*(.+)$/);
+    const simpleMatch = line.match(REGEX_TASK_SIMPLE);
     if (simpleMatch) {
       return {
         id: simpleMatch[1],

@@ -70,3 +70,24 @@ export type FeatureStatus =
   | 'verified' // Automated verification passed
   | 'completed' // Successfully completed
   | 'failed'; // Failed during execution
+
+/**
+ * Dependency graph node representing a feature and its relationships
+ */
+export interface DependencyNode {
+  featureId: string;
+  title?: string;
+  status?: FeatureStatus;
+  dependencies: string[]; // Features this node depends on
+  dependents: string[]; // Features that depend on this node
+}
+
+/**
+ * Complete dependency graph for a project
+ */
+export interface DependencyGraph {
+  nodes: Record<string, DependencyNode>;
+  executionOrder: string[]; // Topologically sorted feature IDs
+  hasCycles: boolean;
+  cycles?: string[][]; // Detected circular dependencies
+}

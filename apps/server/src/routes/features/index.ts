@@ -14,6 +14,12 @@ import { createAgentOutputHandler } from './routes/agent-output.js';
 import { createGenerateTitleHandler } from './routes/generate-title.js';
 import { rollbackFeature } from './rollback.js';
 import { getFeatureSnapshot } from './snapshot.js';
+import {
+  createGetDependenciesHandler,
+  createUpdateDependenciesHandler,
+  createGetDependencyGraphHandler,
+  createDetectDependenciesHandler,
+} from './dependencies.js';
 
 export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
   const router = Router();
@@ -29,6 +35,12 @@ export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
   // Snapshot and rollback routes
   router.post('/rollback', validatePathParams('projectPath'), rollbackFeature);
   router.get('/:featureId/snapshot', getFeatureSnapshot);
+
+  // Dependency management routes
+  router.get('/dependencies/:featureId', createGetDependenciesHandler(featureLoader));
+  router.post('/dependencies', createUpdateDependenciesHandler(featureLoader));
+  router.get('/dependency-graph', createGetDependencyGraphHandler(featureLoader));
+  router.post('/detect-dependencies', createDetectDependenciesHandler(featureLoader));
 
   return router;
 }

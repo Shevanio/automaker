@@ -20,7 +20,14 @@ export type {
 } from './provider.js';
 
 // Feature types
-export type { Feature, FeatureImagePath, FeatureTextFilePath, FeatureStatus } from './feature.js';
+export type {
+  Feature,
+  FeatureImagePath,
+  FeatureTextFilePath,
+  FeatureStatus,
+  DependencyNode,
+  DependencyGraph,
+} from './feature.js';
 
 // Session types
 export type {

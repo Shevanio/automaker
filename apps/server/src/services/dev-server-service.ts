@@ -56,6 +56,12 @@ class DevServerService {
    * Kill any process running on the given port
    */
   private killProcessOnPort(port: number): void {
+    // SECURITY: Validate port is a safe integer to prevent command injection
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      console.warn(`[DevServerService] Invalid port number: ${port}`);
+      return;
+    }
+
     try {
       if (process.platform === 'win32') {
         // Windows: find and kill process on port
@@ -70,6 +76,11 @@ class DevServerService {
           }
         }
         for (const pid of pids) {
+          // SECURITY: Validate PID is numeric to prevent command injection
+          if (!/^\d+$/.test(pid)) {
+            console.warn(`[DevServerService] Invalid PID format: ${pid}`);
+            continue;
+          }
           try {
             execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
             console.log(`[DevServerService] Killed process ${pid} on port ${port}`);
@@ -83,6 +94,11 @@ class DevServerService {
           const result = execSync(`lsof -ti:${port}`, { encoding: 'utf-8' });
           const pids = result.trim().split('\n').filter(Boolean);
           for (const pid of pids) {
+            // SECURITY: Validate PID is numeric to prevent command injection
+            if (!/^\d+$/.test(pid)) {
+              console.warn(`[DevServerService] Invalid PID format: ${pid}`);
+              continue;
+            }
             try {
               execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
               console.log(`[DevServerService] Killed process ${pid} on port ${port}`);

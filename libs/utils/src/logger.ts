@@ -28,6 +28,7 @@ if (envLogLevel && LOG_LEVEL_NAMES[envLogLevel] !== undefined) {
 
 /**
  * Create a logger instance with a context prefix
+ * All log output is automatically sanitized to prevent sensitive data leakage
  */
 export function createLogger(context: string) {
   const prefix = `[${context}]`;
@@ -35,25 +36,29 @@ export function createLogger(context: string) {
   return {
     error: (...args: unknown[]): void => {
       if (currentLogLevel >= LogLevel.ERROR) {
-        console.error(prefix, ...args);
+        const sanitized = sanitizeArgs(args);
+        console.error(prefix, ...sanitized);
       }
     },
 
     warn: (...args: unknown[]): void => {
       if (currentLogLevel >= LogLevel.WARN) {
-        console.warn(prefix, ...args);
+        const sanitized = sanitizeArgs(args);
+        console.warn(prefix, ...sanitized);
       }
     },
 
     info: (...args: unknown[]): void => {
       if (currentLogLevel >= LogLevel.INFO) {
-        console.log(prefix, ...args);
+        const sanitized = sanitizeArgs(args);
+        console.log(prefix, ...sanitized);
       }
     },
 
     debug: (...args: unknown[]): void => {
       if (currentLogLevel >= LogLevel.DEBUG) {
-        console.log(prefix, '[DEBUG]', ...args);
+        const sanitized = sanitizeArgs(args);
+        console.log(prefix, '[DEBUG]', ...sanitized);
       }
     },
   };
@@ -71,4 +76,101 @@ export function getLogLevel(): LogLevel {
  */
 export function setLogLevel(level: LogLevel): void {
   currentLogLevel = level;
+}
+
+/**
+ * Patterns for sensitive data that should be redacted from logs
+ */
+const SENSITIVE_PATTERNS = {
+  // API keys (various formats)
+  apiKey: /\b(api[_-]?key|apikey|key)["\s:=]+([a-zA-Z0-9_\-]{20,})/gi,
+  // Anthropic API keys specifically (sk-ant-...)
+  anthropicKey: /\b(sk-ant-[a-zA-Z0-9_\-]{95,})/gi,
+  // Bearer tokens
+  bearerToken: /\b(bearer\s+)([a-zA-Z0-9_\-.]+)/gi,
+  // JWT tokens
+  jwtToken: /\b(eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+)/gi,
+  // Generic tokens
+  token: /\b(token|access_token|refresh_token)["\s:=]+([a-zA-Z0-9_\-]{20,})/gi,
+  // Passwords
+  password: /\b(password|passwd|pwd)["\s:=]+([^\s"',}]{8,})/gi,
+  // Authorization headers
+  authHeader: /\b(authorization["\s:=]+)([^\s"',}]+)/gi,
+};
+
+/**
+ * Sanitize sensitive data from a value before logging
+ * Recursively sanitizes objects and arrays
+ */
+function sanitizeValue(value: unknown): unknown {
+  // Null/undefined passthrough
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  // Handle strings - apply regex patterns
+  if (typeof value === 'string') {
+    let sanitized = value;
+
+    // Replace API keys
+    sanitized = sanitized.replace(SENSITIVE_PATTERNS.apiKey, '$1="[REDACTED]"');
+
+    // Replace Anthropic keys specifically
+    sanitized = sanitized.replace(SENSITIVE_PATTERNS.anthropicKey, '[REDACTED]');
+
+    // Replace bearer tokens
+    sanitized = sanitized.replace(SENSITIVE_PATTERNS.bearerToken, '$1[REDACTED]');
+
+    // Replace JWT tokens
+    sanitized = sanitized.replace(SENSITIVE_PATTERNS.jwtToken, '[REDACTED]');
+
+    // Replace generic tokens
+    sanitized = sanitized.replace(SENSITIVE_PATTERNS.token, '$1="[REDACTED]"');
+
+    // Replace passwords
+    sanitized = sanitized.replace(SENSITIVE_PATTERNS.password, '$1="[REDACTED]"');
+
+    // Replace authorization headers
+    sanitized = sanitized.replace(SENSITIVE_PATTERNS.authHeader, '$1[REDACTED]');
+
+    return sanitized;
+  }
+
+  // Handle arrays - recursively sanitize elements
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(item));
+  }
+
+  // Handle objects - recursively sanitize properties
+  if (typeof value === 'object') {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      // Redact entire value if key name suggests sensitive data
+      const lowerKey = key.toLowerCase();
+      if (
+        lowerKey.includes('password') ||
+        lowerKey.includes('secret') ||
+        lowerKey.includes('token') ||
+        lowerKey.includes('apikey') ||
+        lowerKey.includes('api_key') ||
+        lowerKey.includes('authorization')
+      ) {
+        sanitized[key] = '[REDACTED]';
+      } else {
+        sanitized[key] = sanitizeValue(val);
+      }
+    }
+    return sanitized;
+  }
+
+  // Other primitives (number, boolean) passthrough
+  return value;
+}
+
+/**
+ * Sanitize all arguments before logging
+ * Protects against accidental logging of sensitive data
+ */
+function sanitizeArgs(args: unknown[]): unknown[] {
+  return args.map((arg) => sanitizeValue(arg));
 }

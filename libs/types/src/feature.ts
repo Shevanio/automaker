@@ -29,7 +29,7 @@ export interface Feature {
   description: string;
   passes?: boolean;
   priority?: number;
-  status?: string;
+  status?: FeatureStatus;
   dependencies?: string[];
   spec?: string;
   model?: string;
@@ -57,4 +57,16 @@ export interface Feature {
   [key: string]: unknown; // Keep catch-all for extensibility
 }
 
-export type FeatureStatus = 'pending' | 'running' | 'completed' | 'failed' | 'verified';
+/**
+ * Feature status enum
+ * Represents all possible states a feature can be in throughout its lifecycle
+ */
+export type FeatureStatus =
+  | 'pending' // Initial state, not yet started
+  | 'ready' // Dependencies satisfied, ready to execute
+  | 'backlog' // Moved back to backlog (failed or cancelled)
+  | 'in_progress' // Currently being implemented
+  | 'waiting_approval' // Awaiting manual verification/approval
+  | 'verified' // Automated verification passed
+  | 'completed' // Successfully completed
+  | 'failed'; // Failed during execution

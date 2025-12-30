@@ -374,7 +374,9 @@ export class AutoModeService {
    */
   async startAutoLoop(projectPath: string, maxConcurrency = 3): Promise<void> {
     if (this.autoLoopRunning) {
-      throw new Error('Auto mode is already running');
+      throw new Error(
+        'Auto mode is already running. Please stop the current auto loop before starting a new one.'
+      );
     }
 
     this.autoLoopRunning = true;
@@ -501,7 +503,9 @@ export class AutoModeService {
     }
   ): Promise<void> {
     if (this.runningFeatures.has(featureId)) {
-      throw new Error('already running');
+      throw new Error(
+        `Feature "${featureId}" is already executing. Wait for it to complete or stop it before starting again.`
+      );
     }
 
     // Add to running features immediately to prevent race conditions
@@ -548,7 +552,9 @@ export class AutoModeService {
       // Load feature details FIRST to get branchName
       const feature = await this.loadFeature(projectPath, featureId);
       if (!feature) {
-        throw new Error(`Feature ${featureId} not found`);
+        throw new Error(
+          `Feature "${featureId}" not found in project "${projectPath}". Ensure the feature exists in .automaker/features/.`
+        );
       }
 
       // Derive workDir from feature.branchName
@@ -905,7 +911,9 @@ Complete the pipeline step instructions above. Review the previous work and appl
    */
   async resumeFeature(projectPath: string, featureId: string, useWorktrees = false): Promise<void> {
     if (this.runningFeatures.has(featureId)) {
-      throw new Error('already running');
+      throw new Error(
+        `Feature "${featureId}" is already executing. Cannot resume a feature that is currently running.`
+      );
     }
 
     // Check if context exists in .automaker directory
@@ -946,7 +954,9 @@ Complete the pipeline step instructions above. Review the previous work and appl
     validateWorkingDirectory(projectPath);
 
     if (this.runningFeatures.has(featureId)) {
-      throw new Error(`Feature ${featureId} is already running`);
+      throw new Error(
+        `Feature "${featureId}" is already running in the verification stage. Stop it before restarting.`
+      );
     }
 
     const abortController = new AbortController();
@@ -2709,7 +2719,9 @@ Implement all the changes described in the plan above.`;
   ): Promise<void> {
     const feature = await this.loadFeature(projectPath, featureId);
     if (!feature) {
-      throw new Error(`Feature ${featureId} not found`);
+      throw new Error(
+        `Feature "${featureId}" not found in project. Cannot continue with missing feature data.`
+      );
     }
 
     const prompt = `## Continuing Feature Implementation

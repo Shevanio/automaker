@@ -1,15 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AgentService } from '@/services/agent-service.js';
-import { ProviderFactory } from '@/providers/provider-factory.js';
 import * as fs from 'fs/promises';
-import * as imageHandler from '@automaker/utils';
-import * as promptBuilder from '@automaker/utils';
-import * as contextLoader from '@automaker/utils';
 import { collectAsyncGenerator } from '../../utils/helpers.js';
 
 vi.mock('fs/promises');
+
+// Mock @automaker/utils with a logger factory
+vi.mock('@automaker/utils', () => {
+  const mockLogger = {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  };
+  return {
+    createLogger: vi.fn(() => mockLogger),
+    loadContextFiles: vi.fn(),
+    readImageAsBase64: vi.fn(),
+    buildPromptWithImages: vi.fn(),
+    isAbortError: vi.fn(),
+    __mockLogger: mockLogger,
+  };
+});
+
 vi.mock('@/providers/provider-factory.js');
-vi.mock('@automaker/utils');
+
+import { AgentService } from '@/services/agent-service.js';
+import { ProviderFactory } from '@/providers/provider-factory.js';
+import * as utils from '@automaker/utils';
+
+const mockLogger = (utils as any).__mockLogger;
 
 describe('agent-service.ts', () => {
   let service: AgentService;
@@ -20,10 +39,15 @@ describe('agent-service.ts', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLogger.info.mockClear();
+    mockLogger.error.mockClear();
+    mockLogger.warn.mockClear();
+    mockLogger.debug.mockClear();
+
     service = new AgentService('/test/data', mockEvents as any);
 
     // Mock loadContextFiles to return empty context by default
-    vi.mocked(contextLoader.loadContextFiles).mockResolvedValue({
+    vi.mocked(utils.loadContextFiles).mockResolvedValue({
       files: [],
       formattedPrompt: '',
     });
@@ -155,7 +179,7 @@ describe('agent-service.ts', () => {
 
       vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
 
-      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+      vi.mocked(utils.buildPromptWithImages).mockResolvedValue({
         content: 'Hello',
         hasImages: false,
       });
@@ -183,14 +207,14 @@ describe('agent-service.ts', () => {
 
       vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
 
-      vi.mocked(imageHandler.readImageAsBase64).mockResolvedValue({
+      vi.mocked(utils.readImageAsBase64).mockResolvedValue({
         base64: 'base64data',
         mimeType: 'image/png',
         filename: 'test.png',
         originalPath: '/path/test.png',
       });
 
-      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+      vi.mocked(utils.buildPromptWithImages).mockResolvedValue({
         content: 'Check image',
         hasImages: true,
       });
@@ -201,7 +225,7 @@ describe('agent-service.ts', () => {
         imagePaths: ['/path/test.png'],
       });
 
-      expect(imageHandler.readImageAsBase64).toHaveBeenCalledWith('/path/test.png');
+      expect(utils.readImageAsBase64).toHaveBeenCalledWith('/path/test.png');
     });
 
     it('should handle failed image loading gracefully', async () => {
@@ -217,14 +241,12 @@ describe('agent-service.ts', () => {
 
       vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
 
-      vi.mocked(imageHandler.readImageAsBase64).mockRejectedValue(new Error('Image not found'));
+      vi.mocked(utils.readImageAsBase64).mockRejectedValue(new Error('Image not found'));
 
-      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+      vi.mocked(utils.buildPromptWithImages).mockResolvedValue({
         content: 'Check image',
         hasImages: false,
       });
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await service.sendMessage({
         sessionId: 'session-1',
@@ -232,8 +254,10 @@ describe('agent-service.ts', () => {
         imagePaths: ['/path/test.png'],
       });
 
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to load image'),
+        expect.any(Error)
+      );
     });
 
     it('should use custom model if provided', async () => {
@@ -249,7 +273,7 @@ describe('agent-service.ts', () => {
 
       vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
 
-      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+      vi.mocked(utils.buildPromptWithImages).mockResolvedValue({
         content: 'Hello',
         hasImages: false,
       });
@@ -276,7 +300,7 @@ describe('agent-service.ts', () => {
 
       vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
 
-      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+      vi.mocked(utils.buildPromptWithImages).mockResolvedValue({
         content: 'Hello',
         hasImages: false,
       });

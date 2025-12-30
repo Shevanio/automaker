@@ -218,6 +218,10 @@ describe('terminal-service.ts', () => {
   describe('createSession', () => {
     it('should create a new terminal session', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
@@ -243,6 +247,10 @@ describe('terminal-service.ts', () => {
 
     it('should use default cols and rows if not provided', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
@@ -260,6 +268,9 @@ describe('terminal-service.ts', () => {
 
     it('should fall back to home directory if cwd does not exist', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockImplementation(() => {
+        throw new Error('ENOENT');
+      });
       vi.mocked(fs.statSync).mockImplementation(() => {
         throw new Error('ENOENT');
       });
@@ -274,6 +285,10 @@ describe('terminal-service.ts', () => {
 
     it('should fall back to home directory if cwd is not a directory', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => false,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
@@ -286,6 +301,10 @@ describe('terminal-service.ts', () => {
 
     it('should fix double slashes in path', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
@@ -298,6 +317,10 @@ describe('terminal-service.ts', () => {
 
     it('should preserve WSL UNC paths', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
@@ -492,6 +515,10 @@ describe('terminal-service.ts', () => {
   describe('getAllSessions', () => {
     it('should return all active sessions', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 

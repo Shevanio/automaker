@@ -275,7 +275,7 @@ describe('auto-mode-service.ts (integration)', () => {
       // Try to start second execution (should throw)
       await expect(
         service.executeFeature(testRepo.path, 'feature-dup', false, false)
-      ).rejects.toThrow('already running');
+      ).rejects.toThrow('already executing');
 
       await promise1;
     }, 30000);

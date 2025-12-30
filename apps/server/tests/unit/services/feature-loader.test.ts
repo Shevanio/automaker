@@ -1,9 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { FeatureLoader } from '@/services/feature-loader.js';
 import * as fs from 'fs/promises';
 import path from 'path';
 
 vi.mock('fs/promises');
+
+// Mock @automaker/utils with a logger factory
+vi.mock('@automaker/utils', () => {
+  const mockLogger = {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  };
+  return {
+    createLogger: vi.fn(() => mockLogger),
+    // Store reference for tests
+    __mockLogger: mockLogger,
+  };
+});
+
+// Import AFTER mocking
+import { FeatureLoader } from '@/services/feature-loader.js';
+import * as utils from '@automaker/utils';
+
+// Get the mock logger reference
+const mockLogger = (utils as any).__mockLogger;
 
 describe('feature-loader.ts', () => {
   let loader: FeatureLoader;
@@ -11,6 +32,11 @@ describe('feature-loader.ts', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLogger.info.mockClear();
+    mockLogger.error.mockClear();
+    mockLogger.warn.mockClear();
+    mockLogger.debug.mockClear();
+
     loader = new FeatureLoader();
   });
 
@@ -122,8 +148,6 @@ describe('feature-loader.ts', () => {
         { name: 'feature-2', isDirectory: () => true } as any,
       ]);
 
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
       vi.mocked(fs.readFile)
         .mockResolvedValueOnce(
           JSON.stringify({
@@ -143,12 +167,9 @@ describe('feature-loader.ts', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('feature-2');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[FeatureLoader]',
+      expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining("missing required 'id' field")
       );
-
-      consoleSpy.mockRestore();
     });
 
     it('should skip features with missing feature.json', async () => {
@@ -183,19 +204,14 @@ describe('feature-loader.ts', () => {
         { name: 'feature-1', isDirectory: () => true } as any,
       ]);
 
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
       vi.mocked(fs.readFile).mockResolvedValue('invalid json{');
 
       const result = await loader.getAll(testProjectPath);
 
       expect(result).toEqual([]);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[FeatureLoader]',
+      expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Failed to parse feature.json')
       );
-
-      consoleSpy.mockRestore();
     });
 
     it('should sort features by creation order (timestamp)', async () => {
@@ -357,17 +373,13 @@ describe('feature-loader.ts', () => {
     it('should return false on error', async () => {
       vi.mocked(fs.rm).mockRejectedValue(new Error('Permission denied'));
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const result = await loader.delete(testProjectPath, 'feature-123');
 
       expect(result).toBe(false);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[FeatureLoader]',
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining('Failed to delete feature'),
         expect.objectContaining({ message: 'Permission denied' })
       );
-      consoleSpy.mockRestore();
     });
   });
 

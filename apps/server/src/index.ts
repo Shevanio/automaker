@@ -109,9 +109,46 @@ if (ENABLE_REQUEST_LOGGING) {
 // from malicious websites. MCP server endpoints can execute arbitrary commands,
 // so allowing any origin would enable RCE from any website visited while Automaker runs.
 const DEFAULT_CORS_ORIGINS = ['http://localhost:3007', 'http://127.0.0.1:3007'];
+
+// SECURITY: Validate CORS_ORIGIN against whitelist
+// Only allow localhost origins to prevent CORS bypass attacks
+function validateCorsOrigin(origin: string | string[] | undefined): string | string[] {
+  if (!origin) {
+    return DEFAULT_CORS_ORIGINS;
+  }
+
+  // Normalize to array
+  const origins = Array.isArray(origin) ? origin : [origin];
+
+  // Whitelist: only allow localhost/127.0.0.1 origins
+  const ALLOWED_PATTERNS = [
+    /^https?:\/\/localhost(:\d+)?$/,
+    /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+    /^https?:\/\/\[::1\](:\d+)?$/, // IPv6 localhost
+  ];
+
+  const validOrigins = origins.filter((o) => {
+    const matches = ALLOWED_PATTERNS.some((pattern) => pattern.test(o));
+    if (!matches) {
+      console.warn(`[Security] Rejecting invalid CORS origin: ${o}`);
+    }
+    return matches;
+  });
+
+  if (validOrigins.length === 0) {
+    console.warn('[Security] No valid CORS origins found in CORS_ORIGIN env var, using defaults');
+    return DEFAULT_CORS_ORIGINS;
+  }
+
+  return validOrigins.length === 1 ? validOrigins[0] : validOrigins;
+}
+
+const corsOrigin = validateCorsOrigin(process.env.CORS_ORIGIN);
+console.log('[Security] CORS origins configured:', corsOrigin);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || DEFAULT_CORS_ORIGINS,
+    origin: corsOrigin,
     credentials: true,
   })
 );

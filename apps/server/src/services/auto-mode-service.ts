@@ -687,7 +687,18 @@ export class AutoModeService {
         });
       } else {
         console.error(`[AutoMode] Feature ${featureId} failed:`, error);
-        await this.updateFeatureStatus(projectPath, featureId, 'backlog');
+
+        // Ensure status update happens even if it fails
+        try {
+          await this.updateFeatureStatus(projectPath, featureId, 'backlog');
+        } catch (statusError) {
+          console.error(
+            `[AutoMode] CRITICAL: Failed to update status for feature ${featureId}:`,
+            statusError
+          );
+          // Continue to emit error event even if status update fails
+        }
+
         this.emitAutoModeEvent('auto_mode_error', {
           featureId,
           error: errorInfo.message,

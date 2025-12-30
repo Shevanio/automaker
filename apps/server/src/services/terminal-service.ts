@@ -29,6 +29,10 @@ let maxSessions = parseInt(process.env.TERMINAL_MAX_SESSIONS || '1000', 10);
 const OUTPUT_THROTTLE_MS = 4; // ~250fps max update rate for responsive input
 const OUTPUT_BATCH_SIZE = 4096; // Smaller batches for lower latency
 
+// Resize debounce delay - wait for prompt to settle after resize
+// 150ms is enough for most prompts - longer causes sluggish feel
+const RESIZE_DEBOUNCE_MS = 150;
+
 export interface TerminalSession {
   id: string;
   pty: pty.IPty;
@@ -413,13 +417,12 @@ export class TerminalService extends EventEmitter {
       session.pty.resize(cols, rows);
 
       // Clear resize flag after a delay (allow prompt to settle)
-      // 150ms is enough for most prompts - longer causes sluggish feel
       // Only set timeout AFTER successful resize
       if (suppressOutput) {
         session.resizeDebounceTimeout = setTimeout(() => {
           session.resizeInProgress = false;
           session.resizeDebounceTimeout = null;
-        }, 150);
+        }, RESIZE_DEBOUNCE_MS);
       }
 
       return true;

@@ -77,8 +77,9 @@ export function createVerifyClaudeAuthHandler() {
       logger.info(`[Setup] Verifying Claude authentication using method: ${authMethod || 'auto'}`);
 
       // Create an AbortController with a 30-second timeout
+      const VERIFICATION_TIMEOUT_MS = 30000; // 30 seconds
       const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 30000);
+      const timeoutId = setTimeout(() => abortController.abort(), VERIFICATION_TIMEOUT_MS);
 
       let authenticated = false;
       let errorMessage = '';

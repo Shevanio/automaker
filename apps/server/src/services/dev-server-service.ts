@@ -23,6 +23,9 @@ export interface DevServerInfo {
 // Port allocation starts at 3001 to avoid conflicts with common dev ports
 const BASE_PORT = 3001;
 const MAX_PORT = 3099; // Safety limit
+const PORT_RELEASE_DELAY_MS = 100; // Delay to let port be released by OS
+const SERVER_STARTUP_DELAY_MS = 100; // Delay for server startup check
+const SERVER_SHUTDOWN_DELAY_MS = 500; // Delay for graceful shutdown
 
 class DevServerService {
   private runningServers: Map<string, DevServerInfo> = new Map();
@@ -115,7 +118,7 @@ class DevServerService {
       this.killProcessOnPort(port);
 
       // Small delay to let the port be released
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, PORT_RELEASE_DELAY_MS));
 
       // Now check if it's available
       if (await this.isPortAvailable(port)) {
@@ -249,7 +252,7 @@ class DevServerService {
     }
 
     // Small delay to ensure related ports are freed
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, SERVER_STARTUP_DELAY_MS));
 
     console.log(`[DevServerService] Starting dev server on port ${port}`);
     console.log(`[DevServerService] Working directory (cwd): ${worktreePath}`);
@@ -302,7 +305,7 @@ class DevServerService {
     });
 
     // Wait a moment to see if the process fails immediately
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, SERVER_SHUTDOWN_DELAY_MS));
 
     if (status.error) {
       return {

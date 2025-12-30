@@ -17,6 +17,81 @@ const logger = createLogger('Terminal');
 // Maximum scrollback buffer size (characters)
 const MAX_SCROLLBACK_SIZE = 50000; // ~50KB per terminal
 
+/**
+ * Circular buffer for terminal output to prevent memory leaks
+ * Maintains a fixed-size buffer and overwrites oldest data when full
+ */
+class CircularBuffer {
+  private buffer: string[] = [];
+  private head = 0;
+  private size = 0;
+  private readonly maxSize: number;
+
+  constructor(maxSize: number) {
+    this.maxSize = maxSize;
+  }
+
+  /**
+   * Add data to the buffer, overwriting oldest if full
+   */
+  append(data: string): void {
+    const currentLength = this.getLength();
+
+    // If adding this data would exceed max size, remove from start
+    if (currentLength + data.length > this.maxSize) {
+      // Calculate how much we need to remove
+      const excess = currentLength + data.length - this.maxSize;
+      this.trimStart(excess);
+    }
+
+    this.buffer.push(data);
+    this.size++;
+  }
+
+  /**
+   * Get all buffered data as a single string
+   */
+  getAll(): string {
+    return this.buffer.join('');
+  }
+
+  /**
+   * Get current buffer length in characters
+   */
+  getLength(): number {
+    return this.buffer.reduce((sum, chunk) => sum + chunk.length, 0);
+  }
+
+  /**
+   * Clear the buffer
+   */
+  clear(): void {
+    this.buffer = [];
+    this.head = 0;
+    this.size = 0;
+  }
+
+  /**
+   * Trim data from the start of the buffer
+   */
+  private trimStart(chars: number): void {
+    let removed = 0;
+    while (removed < chars && this.buffer.length > 0) {
+      const chunk = this.buffer[0];
+      if (chunk.length <= chars - removed) {
+        // Remove entire chunk
+        removed += chunk.length;
+        this.buffer.shift();
+        this.size--;
+      } else {
+        // Partial removal from first chunk
+        this.buffer[0] = chunk.slice(chars - removed);
+        removed = chars;
+      }
+    }
+  }
+}
+
 // Session limit constants - shared with routes/settings.ts
 export const MIN_MAX_SESSIONS = 1;
 export const MAX_MAX_SESSIONS = 1000;
@@ -42,7 +117,7 @@ export interface TerminalSession {
   cwd: string;
   createdAt: Date;
   shell: string;
-  scrollbackBuffer: string; // Store recent output for replay on reconnect
+  scrollbackBuffer: CircularBuffer; // Store recent output for replay on reconnect (max 50KB)
   outputBuffer: string; // Pending output to be flushed
   flushTimeout: NodeJS.Timeout | null; // Throttle timer
   resizeInProgress: boolean; // Flag to suppress scrollback during resize
@@ -314,7 +389,7 @@ export class TerminalService extends EventEmitter {
       cwd,
       createdAt: new Date(),
       shell,
-      scrollbackBuffer: '',
+      scrollbackBuffer: new CircularBuffer(MAX_SCROLLBACK_SIZE),
       outputBuffer: '',
       flushTimeout: null,
       resizeInProgress: false,
@@ -352,12 +427,8 @@ export class TerminalService extends EventEmitter {
         return;
       }
 
-      // Append to scrollback buffer
-      session.scrollbackBuffer += data;
-      // Trim if too large (keep the most recent data)
-      if (session.scrollbackBuffer.length > MAX_SCROLLBACK_SIZE) {
-        session.scrollbackBuffer = session.scrollbackBuffer.slice(-MAX_SCROLLBACK_SIZE);
-      }
+      // Append to scrollback buffer (automatically trims if too large)
+      session.scrollbackBuffer.append(data);
 
       // Buffer output for throttled live delivery
       session.outputBuffer += data;
@@ -504,7 +575,7 @@ export class TerminalService extends EventEmitter {
    */
   getScrollback(sessionId: string): string | null {
     const session = this.sessions.get(sessionId);
-    return session?.scrollbackBuffer || null;
+    return session ? session.scrollbackBuffer.getAll() : null;
   }
 
   /**
@@ -528,7 +599,7 @@ export class TerminalService extends EventEmitter {
     // if the shell hasn't output its prompt yet when WebSocket connects.
     // The resize() method handles suppression during actual resize events.
 
-    return session.scrollbackBuffer || null;
+    return session.scrollbackBuffer.getAll();
   }
 
   /**

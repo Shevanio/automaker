@@ -494,11 +494,16 @@ describe('terminal-service.ts', () => {
   describe('getScrollback', () => {
     it('should return scrollback buffer for existing session', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
       const session = service.createSession();
-      session.scrollbackBuffer = 'test scrollback';
+      // Append data to circular buffer
+      session.scrollbackBuffer.append('test scrollback');
 
       const scrollback = service.getScrollback(session.id);
 
@@ -561,9 +566,62 @@ describe('terminal-service.ts', () => {
     });
   });
 
+  describe('circular buffer', () => {
+    it('should trim old data when exceeding max size', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+      vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
+
+      const session = service.createSession();
+
+      // Create string larger than MAX_SCROLLBACK_SIZE (50KB)
+      const largeChunk = 'x'.repeat(30000); // 30KB
+
+      session.scrollbackBuffer.append(largeChunk); // 30KB
+      session.scrollbackBuffer.append(largeChunk); // 60KB total
+
+      const result = session.scrollbackBuffer.getAll();
+
+      // Should have trimmed to fit within 50KB
+      expect(result.length).toBeLessThanOrEqual(50000);
+      expect(result.length).toBeGreaterThan(30000); // Still has most recent data
+    });
+
+    it('should preserve most recent data when trimming', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+      vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
+
+      const session = service.createSession();
+
+      session.scrollbackBuffer.append('old data');
+      const largeChunk = 'new'.repeat(20000); // 60KB
+      session.scrollbackBuffer.append(largeChunk);
+
+      const result = session.scrollbackBuffer.getAll();
+
+      // Old data should be trimmed
+      expect(result).not.toContain('old data');
+      // New data should be preserved
+      expect(result).toContain('newnewnew');
+    });
+  });
+
   describe('cleanup', () => {
     it('should clean up all sessions', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
@@ -579,6 +637,10 @@ describe('terminal-service.ts', () => {
 
     it('should handle cleanup errors gracefully', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+      } as any);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
       mockPtyProcess.kill.mockImplementation(() => {

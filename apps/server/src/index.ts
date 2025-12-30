@@ -9,6 +9,7 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
@@ -154,6 +155,28 @@ app.use(
 );
 app.use(express.json({ limit: '50mb' }));
 
+// SECURITY: Rate limiting to prevent abuse
+// General rate limit for all API endpoints
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+  legacyHeaders: false, // Disable `X-RateLimit-*` headers
+});
+
+// Stricter rate limit for agent/AI endpoints (expensive operations)
+const agentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // Limit each IP to 50 agent requests per 15 minutes
+  message: 'Too many AI agent requests. Please wait before starting new conversations.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply general rate limiter to all routes
+app.use('/api/', generalLimiter);
+
 // Create shared event emitter for streaming
 const events: EventEmitter = createEventEmitter();
 
@@ -188,17 +211,24 @@ app.use('/api/health', createHealthRoutes());
 app.use('/api', authMiddleware);
 
 app.use('/api/fs', createFsRoutes(events));
-app.use('/api/agent', createAgentRoutes(agentService, events));
+// Apply stricter rate limiting to AI agent endpoints
+app.use('/api/agent', agentLimiter, createAgentRoutes(agentService, events));
 app.use('/api/sessions', createSessionsRoutes(agentService));
 app.use('/api/features', createFeaturesRoutes(featureLoader));
-app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
-app.use('/api/enhance-prompt', createEnhancePromptRoutes());
+// Apply stricter rate limiting to auto-mode (uses AI agent internally)
+app.use('/api/auto-mode', agentLimiter, createAutoModeRoutes(autoModeService));
+// Apply stricter rate limiting to AI-powered endpoints
+app.use('/api/enhance-prompt', agentLimiter, createEnhancePromptRoutes());
 app.use('/api/worktree', createWorktreeRoutes());
 app.use('/api/git', createGitRoutes());
 app.use('/api/setup', createSetupRoutes());
-app.use('/api/suggestions', createSuggestionsRoutes(events, settingsService));
+app.use('/api/suggestions', agentLimiter, createSuggestionsRoutes(events, settingsService));
 app.use('/api/models', createModelsRoutes());
-app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events, settingsService));
+app.use(
+  '/api/spec-regeneration',
+  agentLimiter,
+  createSpecRegenerationRoutes(events, settingsService)
+);
 app.use('/api/running-agents', createRunningAgentsRoutes(autoModeService));
 app.use('/api/workspace', createWorkspaceRoutes());
 app.use('/api/templates', createTemplatesRoutes());
@@ -207,7 +237,8 @@ app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/github', createGitHubRoutes(events, settingsService));
 app.use('/api/context', createContextRoutes(settingsService));
-app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
+// Apply stricter rate limiting to AI-powered backlog planning
+app.use('/api/backlog-plan', agentLimiter, createBacklogPlanRoutes(events, settingsService));
 app.use('/api/mcp', createMCPRoutes(mcpTestService));
 app.use('/api/pipeline', createPipelineRoutes(pipelineService));
 

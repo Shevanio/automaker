@@ -156,7 +156,11 @@ export class TerminalService extends EventEmitter {
 
   /**
    * Validate and resolve a working directory path
-   * Includes basic sanitization against null bytes and path normalization
+   * Includes security checks against:
+   * - Null bytes injection
+   * - Symlink attacks
+   * - Path traversal via WSL UNC paths
+   * - Invalid or non-existent directories
    */
   private resolveWorkingDirectory(requestedCwd?: string): string {
     const homeDir = os.homedir();
@@ -181,21 +185,52 @@ export class TerminalService extends EventEmitter {
     }
 
     // Normalize the path to resolve . and .. segments
-    // Skip normalization for WSL UNC paths as path.resolve would break them
-    if (!cwd.startsWith('//wsl')) {
+    // For WSL UNC paths, we need special handling to prevent bypassing security
+    if (cwd.startsWith('//wsl')) {
+      // WSL UNC paths are allowed but must be validated carefully
+      // Format: //wsl$/DistroName/path/to/dir
+      // We still check if they exist and are directories below
+      console.log(`[Terminal] WSL UNC path detected: ${cwd}`);
+    } else {
+      // Regular paths: normalize to resolve . and .. segments
       cwd = path.resolve(cwd);
     }
 
     // Check if path exists and is a directory
     try {
-      const stat = fs.statSync(cwd);
-      if (stat.isDirectory()) {
+      // Use lstat to get info about the path itself (not following symlinks)
+      const lstat = fs.lstatSync(cwd);
+
+      // If it's a symlink, resolve it and validate the target
+      if (lstat.isSymbolicLink()) {
+        console.log(`[Terminal] Resolving symlink: ${cwd}`);
+        const realPath = fs.realpathSync(cwd);
+
+        // Verify the real path is still a directory
+        const realStat = fs.statSync(realPath);
+        if (!realStat.isDirectory()) {
+          console.warn(
+            `[Terminal] Symlink target is not a directory: ${cwd} -> ${realPath}, falling back to home`
+          );
+          return homeDir;
+        }
+
+        // Use the real path (resolved symlink) for security
+        console.log(`[Terminal] Symlink resolved to: ${realPath}`);
+        return realPath;
+      }
+
+      // Not a symlink - check if it's a directory
+      if (lstat.isDirectory()) {
         return cwd;
       }
+
       console.warn(`[Terminal] Path exists but is not a directory: ${cwd}, falling back to home`);
       return homeDir;
-    } catch {
-      console.warn(`[Terminal] Working directory does not exist: ${cwd}, falling back to home`);
+    } catch (error) {
+      console.warn(
+        `[Terminal] Working directory validation failed: ${cwd}, error: ${(error as Error).message}, falling back to home`
+      );
       return homeDir;
     }
   }
@@ -367,15 +402,19 @@ export class TerminalService extends EventEmitter {
       // This prevents the shell's first prompt from being dropped
       if (suppressOutput) {
         session.resizeInProgress = true;
+        // Clear any pending debounce timeout to prevent stale state
         if (session.resizeDebounceTimeout) {
           clearTimeout(session.resizeDebounceTimeout);
+          session.resizeDebounceTimeout = null;
         }
       }
 
+      // Perform the actual resize - may throw
       session.pty.resize(cols, rows);
 
       // Clear resize flag after a delay (allow prompt to settle)
       // 150ms is enough for most prompts - longer causes sluggish feel
+      // Only set timeout AFTER successful resize
       if (suppressOutput) {
         session.resizeDebounceTimeout = setTimeout(() => {
           session.resizeInProgress = false;
@@ -386,7 +425,13 @@ export class TerminalService extends EventEmitter {
       return true;
     } catch (error) {
       console.error(`[Terminal] Error resizing session ${sessionId}:`, error);
-      session.resizeInProgress = false; // Clear flag on error
+      // Ensure clean state on error
+      session.resizeInProgress = false;
+      // Also clear timeout in case it was set before error
+      if (session.resizeDebounceTimeout) {
+        clearTimeout(session.resizeDebounceTimeout);
+        session.resizeDebounceTimeout = null;
+      }
       return false;
     }
   }

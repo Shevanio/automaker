@@ -203,6 +203,15 @@ server.on('upgrade', (request, socket, head) => {
 wss.on('connection', (ws: WebSocket) => {
   console.log('[WebSocket] Client connected, ready state:', ws.readyState);
 
+  // Track if already unsubscribed to prevent double-cleanup
+  let hasUnsubscribed = false;
+  const safeUnsubscribe = () => {
+    if (!hasUnsubscribed) {
+      hasUnsubscribed = true;
+      unsubscribe();
+    }
+  };
+
   // Subscribe to all events and forward to this client
   const unsubscribe = events.subscribe((type, payload) => {
     console.log('[WebSocket] Event received:', {
@@ -214,29 +223,39 @@ wss.on('connection', (ws: WebSocket) => {
     });
 
     if (ws.readyState === WebSocket.OPEN) {
-      const message = JSON.stringify({ type, payload });
-      console.log('[WebSocket] Sending event to client:', {
-        type,
-        messageLength: message.length,
-        sessionId: (payload as any)?.sessionId,
-      });
-      ws.send(message);
+      try {
+        const message = JSON.stringify({ type, payload });
+        console.log('[WebSocket] Sending event to client:', {
+          type,
+          messageLength: message.length,
+          sessionId: (payload as any)?.sessionId,
+        });
+        ws.send(message);
+      } catch (error) {
+        console.error('[WebSocket] ERROR sending message:', error);
+        // Clean up subscription if send fails
+        safeUnsubscribe();
+        // Close the connection on send error
+        ws.close();
+      }
     } else {
       console.log(
         '[WebSocket] WARNING: Cannot send event, WebSocket not open. ReadyState:',
         ws.readyState
       );
+      // If WebSocket is not open, clean up subscription
+      safeUnsubscribe();
     }
   });
 
   ws.on('close', () => {
     console.log('[WebSocket] Client disconnected');
-    unsubscribe();
+    safeUnsubscribe();
   });
 
   ws.on('error', (error) => {
     console.error('[WebSocket] ERROR:', error);
-    unsubscribe();
+    safeUnsubscribe();
   });
 });
 

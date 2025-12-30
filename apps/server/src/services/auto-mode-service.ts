@@ -1765,25 +1765,35 @@ Format your response as a structured markdown document.`;
       const allFeatures: Feature[] = [];
       const pendingFeatures: Feature[] = [];
 
-      // Load all features (for dependency checking)
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
+      // Load all features in parallel (for dependency checking)
+      const featureLoadPromises = entries
+        .filter((entry) => entry.isDirectory())
+        .map(async (entry) => {
           const featurePath = path.join(featuresDir, entry.name, 'feature.json');
           try {
             const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
             const feature = JSON.parse(data);
-            allFeatures.push(feature);
-
-            // Track pending features separately
-            if (
-              feature.status === 'pending' ||
-              feature.status === 'ready' ||
-              feature.status === 'backlog'
-            ) {
-              pendingFeatures.push(feature);
-            }
+            return feature;
           } catch {
             // Skip invalid features
+            return null;
+          }
+        });
+
+      const loadedFeatures = await Promise.all(featureLoadPromises);
+
+      // Filter out nulls and separate pending features
+      for (const feature of loadedFeatures) {
+        if (feature) {
+          allFeatures.push(feature);
+
+          // Track pending features separately
+          if (
+            feature.status === 'pending' ||
+            feature.status === 'ready' ||
+            feature.status === 'backlog'
+          ) {
+            pendingFeatures.push(feature);
           }
         }
       }

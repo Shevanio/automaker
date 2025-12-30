@@ -165,8 +165,61 @@ Use `resolveModelString()` from `@automaker/model-resolver` to convert model ali
 
 ## Environment Variables
 
+### Required
+
 - `ANTHROPIC_API_KEY` - Anthropic API key (or use Claude Code CLI auth)
+
+### Server Configuration
+
 - `PORT` - Server port (default: 3008)
 - `DATA_DIR` - Data storage directory (default: ./data)
+- `CORS_ORIGIN` - Allowed CORS origins (default: localhost:3007)
+- `ENABLE_REQUEST_LOGGING` - Enable HTTP request logging (default: true)
+
+### Security
+
 - `ALLOWED_ROOT_DIRECTORY` - Restrict file operations to specific directory
+- `TERMINAL_MAX_SESSIONS` - Maximum terminal sessions (default: 1000)
+
+### Testing
+
 - `AUTOMAKER_MOCK_AGENT=true` - Enable mock agent mode for CI testing
+
+## Security
+
+Automaker implements multiple security layers. See [docs/SECURITY.md](docs/SECURITY.md) for details.
+
+### Quick Reference
+
+**Input Sanitization**:
+
+```typescript
+import { sanitizeFilename } from '@automaker/platform';
+const safe = sanitizeFilename(userInput); // Prevents path traversal
+```
+
+**Path Validation**:
+
+```typescript
+import { validatePath, isPathAllowed } from '@automaker/platform';
+validatePath(path); // Throws if outside allowed directories
+```
+
+**Image Validation**:
+
+```typescript
+import { readImageAsBase64 } from '@automaker/utils';
+const img = await readImageAsBase64(path); // Max 10MB, validates size
+```
+
+**Rate Limiting**: Automatically enforced (1000 req/15min general, 50 req/15min AI endpoints)
+
+**Command Execution**: Always validate inputs before shell commands:
+
+```typescript
+// ✅ GOOD
+spawn('git', ['clone', url, path]);
+
+// ❌ BAD
+exec(`git clone ${url} ${path}`);
+```

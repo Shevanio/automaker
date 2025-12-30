@@ -354,6 +354,7 @@ export class AutoModeService {
   private autoLoopAbortController: AbortController | null = null;
   private config: AutoModeConfig | null = null;
   private pendingApprovals = new Map<string, PendingApproval>();
+  private planApprovalLocks = new Set<string>(); // Mutex for plan approval operations
   private settingsService: SettingsService | null = null;
 
   constructor(events: EventEmitter, settingsService?: SettingsService) {
@@ -1478,6 +1479,7 @@ Format your response as a structured markdown document.`;
   /**
    * Resolve a pending plan approval.
    * Called when the user approves or rejects the plan via API.
+   * Uses mutex to prevent race conditions from concurrent approval/rejection requests.
    */
   async resolvePlanApproval(
     featureId: string,
@@ -1486,118 +1488,138 @@ Format your response as a structured markdown document.`;
     feedback?: string,
     projectPathFromClient?: string
   ): Promise<{ success: boolean; error?: string }> {
-    console.log(
-      `[AutoMode] resolvePlanApproval called for feature ${featureId}, approved=${approved}`
-    );
-    console.log(
-      `[AutoMode] Current pending approvals: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
-    );
-    const pending = this.pendingApprovals.get(featureId);
-
-    if (!pending) {
-      console.log(`[AutoMode] No pending approval in Map for feature ${featureId}`);
-
-      // RECOVERY: If no pending approval but we have projectPath from client,
-      // check if feature's planSpec.status is 'generated' and handle recovery
-      if (projectPathFromClient) {
-        console.log(`[AutoMode] Attempting recovery with projectPath: ${projectPathFromClient}`);
-        const feature = await this.loadFeature(projectPathFromClient, featureId);
-
-        if (feature?.planSpec?.status === 'generated') {
-          console.log(
-            `[AutoMode] Feature ${featureId} has planSpec.status='generated', performing recovery`
-          );
-
-          if (approved) {
-            // Update planSpec to approved
-            await this.updateFeaturePlanSpec(projectPathFromClient, featureId, {
-              status: 'approved',
-              approvedAt: new Date().toISOString(),
-              reviewedByUser: true,
-              content: editedPlan || feature.planSpec.content,
-            });
-
-            // Build continuation prompt and re-run the feature
-            const planContent = editedPlan || feature.planSpec.content || '';
-            let continuationPrompt = `The plan/specification has been approved. `;
-            if (feedback) {
-              continuationPrompt += `\n\nUser feedback: ${feedback}\n\n`;
-            }
-            continuationPrompt += `Now proceed with the implementation as specified in the plan:\n\n${planContent}\n\nImplement the feature now.`;
-
-            console.log(`[AutoMode] Starting recovery execution for feature ${featureId}`);
-
-            // Start feature execution with the continuation prompt (async, don't await)
-            // Pass undefined for providedWorktreePath, use options for continuation prompt
-            this.executeFeature(projectPathFromClient, featureId, true, false, undefined, {
-              continuationPrompt,
-            }).catch((error) => {
-              console.error(
-                `[AutoMode] Recovery execution failed for feature ${featureId}:`,
-                error
-              );
-            });
-
-            return { success: true };
-          } else {
-            // Rejected - update status and emit event
-            await this.updateFeaturePlanSpec(projectPathFromClient, featureId, {
-              status: 'rejected',
-              reviewedByUser: true,
-            });
-
-            await this.updateFeatureStatus(projectPathFromClient, featureId, 'backlog');
-
-            this.emitAutoModeEvent('plan_rejected', {
-              featureId,
-              projectPath: projectPathFromClient,
-              feedback,
-            });
-
-            return { success: true };
-          }
-        }
-      }
-
+    // Mutex: Prevent concurrent plan approval operations for the same feature
+    if (this.planApprovalLocks.has(featureId)) {
       console.log(
-        `[AutoMode] ERROR: No pending approval found for feature ${featureId} and recovery not possible`
+        `[AutoMode] Plan approval already in progress for feature ${featureId}, rejecting duplicate request`
       );
       return {
         success: false,
-        error: `No pending approval for feature ${featureId}`,
+        error: `Plan approval already in progress for feature ${featureId}`,
       };
     }
-    console.log(`[AutoMode] Found pending approval for feature ${featureId}, proceeding...`);
 
-    const { projectPath } = pending;
+    // Acquire lock
+    this.planApprovalLocks.add(featureId);
 
-    // Update feature's planSpec status
-    await this.updateFeaturePlanSpec(projectPath, featureId, {
-      status: approved ? 'approved' : 'rejected',
-      approvedAt: approved ? new Date().toISOString() : undefined,
-      reviewedByUser: true,
-      content: editedPlan, // Update content if user provided an edited version
-    });
+    try {
+      console.log(
+        `[AutoMode] resolvePlanApproval called for feature ${featureId}, approved=${approved}`
+      );
+      console.log(
+        `[AutoMode] Current pending approvals: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
+      );
+      const pending = this.pendingApprovals.get(featureId);
 
-    // If rejected with feedback, we can store it for the user to see
-    if (!approved && feedback) {
-      // Emit event so client knows the rejection reason
-      this.emitAutoModeEvent('plan_rejected', {
-        featureId,
-        projectPath,
-        feedback,
+      if (!pending) {
+        console.log(`[AutoMode] No pending approval in Map for feature ${featureId}`);
+
+        // RECOVERY: If no pending approval but we have projectPath from client,
+        // check if feature's planSpec.status is 'generated' and handle recovery
+        if (projectPathFromClient) {
+          console.log(`[AutoMode] Attempting recovery with projectPath: ${projectPathFromClient}`);
+          const feature = await this.loadFeature(projectPathFromClient, featureId);
+
+          if (feature?.planSpec?.status === 'generated') {
+            console.log(
+              `[AutoMode] Feature ${featureId} has planSpec.status='generated', performing recovery`
+            );
+
+            if (approved) {
+              // Update planSpec to approved
+              await this.updateFeaturePlanSpec(projectPathFromClient, featureId, {
+                status: 'approved',
+                approvedAt: new Date().toISOString(),
+                reviewedByUser: true,
+                content: editedPlan || feature.planSpec.content,
+              });
+
+              // Build continuation prompt and re-run the feature
+              const planContent = editedPlan || feature.planSpec.content || '';
+              let continuationPrompt = `The plan/specification has been approved. `;
+              if (feedback) {
+                continuationPrompt += `\n\nUser feedback: ${feedback}\n\n`;
+              }
+              continuationPrompt += `Now proceed with the implementation as specified in the plan:\n\n${planContent}\n\nImplement the feature now.`;
+
+              console.log(`[AutoMode] Starting recovery execution for feature ${featureId}`);
+
+              // Start feature execution with the continuation prompt (async, don't await)
+              // Pass undefined for providedWorktreePath, use options for continuation prompt
+              this.executeFeature(projectPathFromClient, featureId, true, false, undefined, {
+                continuationPrompt,
+              }).catch((error) => {
+                console.error(
+                  `[AutoMode] Recovery execution failed for feature ${featureId}:`,
+                  error
+                );
+              });
+
+              return { success: true };
+            } else {
+              // Rejected - update status and emit event
+              await this.updateFeaturePlanSpec(projectPathFromClient, featureId, {
+                status: 'rejected',
+                reviewedByUser: true,
+              });
+
+              await this.updateFeatureStatus(projectPathFromClient, featureId, 'backlog');
+
+              this.emitAutoModeEvent('plan_rejected', {
+                featureId,
+                projectPath: projectPathFromClient,
+                feedback,
+              });
+
+              return { success: true };
+            }
+          }
+        }
+
+        console.log(
+          `[AutoMode] ERROR: No pending approval found for feature ${featureId} and recovery not possible`
+        );
+        return {
+          success: false,
+          error: `No pending approval for feature ${featureId}`,
+        };
+      }
+      console.log(`[AutoMode] Found pending approval for feature ${featureId}, proceeding...`);
+
+      const { projectPath } = pending;
+
+      // Update feature's planSpec status
+      await this.updateFeaturePlanSpec(projectPath, featureId, {
+        status: approved ? 'approved' : 'rejected',
+        approvedAt: approved ? new Date().toISOString() : undefined,
+        reviewedByUser: true,
+        content: editedPlan, // Update content if user provided an edited version
       });
+
+      // If rejected with feedback, we can store it for the user to see
+      if (!approved && feedback) {
+        // Emit event so client knows the rejection reason
+        this.emitAutoModeEvent('plan_rejected', {
+          featureId,
+          projectPath,
+          feedback,
+        });
+      }
+
+      // Resolve the promise with all data including feedback
+      pending.resolve({ approved, editedPlan, feedback });
+      this.pendingApprovals.delete(featureId);
+
+      return { success: true };
+    } finally {
+      // Release lock
+      this.planApprovalLocks.delete(featureId);
     }
-
-    // Resolve the promise with all data including feedback
-    pending.resolve({ approved, editedPlan, feedback });
-    this.pendingApprovals.delete(featureId);
-
-    return { success: true };
   }
 
   /**
    * Cancel a pending plan approval (e.g., when feature is stopped).
+   * Also releases any associated lock.
    */
   cancelPlanApproval(featureId: string): void {
     console.log(`[AutoMode] cancelPlanApproval called for feature ${featureId}`);
@@ -1609,6 +1631,7 @@ Format your response as a structured markdown document.`;
       console.log(`[AutoMode] Found and cancelling pending approval for feature ${featureId}`);
       pending.reject(new Error('Plan approval cancelled - feature was stopped'));
       this.pendingApprovals.delete(featureId);
+      this.planApprovalLocks.delete(featureId); // Release lock
     } else {
       console.log(`[AutoMode] No pending approval to cancel for feature ${featureId}`);
     }

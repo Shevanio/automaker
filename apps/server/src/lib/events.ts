@@ -17,13 +17,17 @@ export function createEventEmitter(): EventEmitter {
 
   return {
     emit(type: EventType, payload: unknown) {
-      for (const callback of subscribers) {
-        try {
-          callback(type, payload);
-        } catch (error) {
-          console.error('Error in event subscriber:', error);
+      // Emit events asynchronously to avoid blocking the main thread
+      // This ensures that heavy event processing doesn't delay the caller
+      setImmediate(() => {
+        for (const callback of subscribers) {
+          try {
+            callback(type, payload);
+          } catch (error) {
+            console.error('Error in event subscriber:', error);
+          }
         }
-      }
+      });
     },
 
     subscribe(callback: EventCallback) {

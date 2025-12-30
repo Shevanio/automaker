@@ -183,6 +183,9 @@ describe('Auto-Mode Loop E2E', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       await autoModeService.stopAutoLoop();
 
+      // Wait for async event emission
+      await new Promise((resolve) => setImmediate(resolve));
+
       unsubscribe();
       expect(emittedEvents).toContain('stopped');
     });

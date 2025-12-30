@@ -1,20 +1,25 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createEventEmitter, type EventType } from '@/lib/events.js';
 
+// Helper to wait for async event emission (setImmediate)
+const waitForEvents = () => new Promise((resolve) => setImmediate(resolve));
+
 describe('events.ts', () => {
   describe('createEventEmitter', () => {
-    it('should emit events to single subscriber', () => {
+    it('should emit events to single subscriber', async () => {
       const emitter = createEventEmitter();
       const callback = vi.fn();
 
       emitter.subscribe(callback);
       emitter.emit('agent:stream', { message: 'test' });
 
+      await waitForEvents();
+
       expect(callback).toHaveBeenCalledOnce();
       expect(callback).toHaveBeenCalledWith('agent:stream', { message: 'test' });
     });
 
-    it('should emit events to multiple subscribers', () => {
+    it('should emit events to multiple subscribers', async () => {
       const emitter = createEventEmitter();
       const callback1 = vi.fn();
       const callback2 = vi.fn();
@@ -25,28 +30,34 @@ describe('events.ts', () => {
       emitter.subscribe(callback3);
       emitter.emit('feature:started', { id: '123' });
 
+      await waitForEvents();
+
       expect(callback1).toHaveBeenCalledOnce();
       expect(callback2).toHaveBeenCalledOnce();
       expect(callback3).toHaveBeenCalledOnce();
       expect(callback1).toHaveBeenCalledWith('feature:started', { id: '123' });
     });
 
-    it('should support unsubscribe functionality', () => {
+    it('should support unsubscribe functionality', async () => {
       const emitter = createEventEmitter();
       const callback = vi.fn();
 
       const unsubscribe = emitter.subscribe(callback);
       emitter.emit('agent:stream', { test: 1 });
 
+      await waitForEvents();
+
       expect(callback).toHaveBeenCalledOnce();
 
       unsubscribe();
       emitter.emit('agent:stream', { test: 2 });
 
+      await waitForEvents();
+
       expect(callback).toHaveBeenCalledOnce(); // Still called only once
     });
 
-    it('should handle errors in subscribers without crashing', () => {
+    it('should handle errors in subscribers without crashing', async () => {
       const emitter = createEventEmitter();
       const errorCallback = vi.fn(() => {
         throw new Error('Subscriber error');
@@ -61,6 +72,8 @@ describe('events.ts', () => {
         emitter.emit('feature:error', { error: 'test' });
       }).not.toThrow();
 
+      await waitForEvents();
+
       expect(errorCallback).toHaveBeenCalledOnce();
       expect(normalCallback).toHaveBeenCalledOnce();
       expect(consoleSpy).toHaveBeenCalled();
@@ -68,7 +81,7 @@ describe('events.ts', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should emit different event types', () => {
+    it('should emit different event types', async () => {
       const emitter = createEventEmitter();
       const callback = vi.fn();
 
@@ -85,6 +98,8 @@ describe('events.ts', () => {
         emitter.emit(type, { type });
       });
 
+      await waitForEvents();
+
       expect(callback).toHaveBeenCalledTimes(4);
     });
 
@@ -96,7 +111,7 @@ describe('events.ts', () => {
       }).not.toThrow();
     });
 
-    it('should allow multiple subscriptions and unsubscriptions', () => {
+    it('should allow multiple subscriptions and unsubscriptions', async () => {
       const emitter = createEventEmitter();
       const callback1 = vi.fn();
       const callback2 = vi.fn();
@@ -107,6 +122,8 @@ describe('events.ts', () => {
       const unsub3 = emitter.subscribe(callback3);
 
       emitter.emit('feature:started', { test: 1 });
+      await waitForEvents();
+
       expect(callback1).toHaveBeenCalledOnce();
       expect(callback2).toHaveBeenCalledOnce();
       expect(callback3).toHaveBeenCalledOnce();
@@ -114,6 +131,8 @@ describe('events.ts', () => {
       unsub2();
 
       emitter.emit('feature:started', { test: 2 });
+      await waitForEvents();
+
       expect(callback1).toHaveBeenCalledTimes(2);
       expect(callback2).toHaveBeenCalledOnce(); // Still just once
       expect(callback3).toHaveBeenCalledTimes(2);
@@ -122,6 +141,8 @@ describe('events.ts', () => {
       unsub3();
 
       emitter.emit('feature:started', { test: 3 });
+      await waitForEvents();
+
       expect(callback1).toHaveBeenCalledTimes(2);
       expect(callback2).toHaveBeenCalledOnce();
       expect(callback3).toHaveBeenCalledTimes(2);

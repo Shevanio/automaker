@@ -287,6 +287,47 @@ wss.on('connection', (ws: WebSocket) => {
     }
   };
 
+  // Event batching configuration
+  const BATCH_INTERVAL_MS = 50; // 50ms batching window
+  const URGENT_EVENT_TYPES = new Set(['auto-mode:error', 'feature:error', 'agent:error']);
+  let eventBatch: Array<{ type: string; payload: unknown }> = [];
+  let batchTimer: NodeJS.Timeout | null = null;
+
+  // Flush batched events to client
+  const flushBatch = () => {
+    if (batchTimer) {
+      clearTimeout(batchTimer);
+      batchTimer = null;
+    }
+
+    if (eventBatch.length === 0 || ws.readyState !== WebSocket.OPEN) {
+      eventBatch = [];
+      return;
+    }
+
+    try {
+      // Send batched events as array
+      const message = JSON.stringify({
+        type: 'batch',
+        events: eventBatch,
+        count: eventBatch.length,
+      });
+
+      logger.info('[WebSocket] Sending batched events to client:', {
+        batchSize: eventBatch.length,
+        messageLength: message.length,
+      });
+
+      ws.send(message);
+      eventBatch = [];
+    } catch (error) {
+      logger.error('[WebSocket] ERROR sending batched message:', error);
+      eventBatch = [];
+      safeUnsubscribe();
+      ws.close();
+    }
+  };
+
   // Subscribe to all events and forward to this client
   const unsubscribe = events.subscribe((type, payload) => {
     logger.info('[WebSocket] Event received:', {
@@ -297,29 +338,48 @@ wss.on('connection', (ws: WebSocket) => {
       wsOpen: ws.readyState === WebSocket.OPEN,
     });
 
-    if (ws.readyState === WebSocket.OPEN) {
-      try {
-        const message = JSON.stringify({ type, payload });
-        logger.info('[WebSocket] Sending event to client:', {
-          type,
-          messageLength: message.length,
-          sessionId: (payload as any)?.sessionId,
-        });
-        ws.send(message);
-      } catch (error) {
-        logger.error('[WebSocket] ERROR sending message:', error);
-        // Clean up subscription if send fails
-        safeUnsubscribe();
-        // Close the connection on send error
-        ws.close();
-      }
-    } else {
+    if (ws.readyState !== WebSocket.OPEN) {
       logger.info(
         '[WebSocket] WARNING: Cannot send event, WebSocket not open. ReadyState:',
         ws.readyState
       );
-      // If WebSocket is not open, clean up subscription
       safeUnsubscribe();
+      return;
+    }
+
+    // Check if this is an urgent event that should bypass batching
+    const isUrgent = URGENT_EVENT_TYPES.has(type);
+
+    if (isUrgent) {
+      // Flush pending batch first
+      flushBatch();
+
+      // Send urgent event immediately
+      try {
+        const message = JSON.stringify({ type, payload });
+        logger.info('[WebSocket] Sending urgent event immediately:', {
+          type,
+          messageLength: message.length,
+        });
+        ws.send(message);
+      } catch (error) {
+        logger.error('[WebSocket] ERROR sending urgent message:', error);
+        safeUnsubscribe();
+        ws.close();
+      }
+    } else {
+      // Add to batch
+      eventBatch.push({ type, payload });
+
+      // Schedule batch flush if not already scheduled
+      if (!batchTimer) {
+        batchTimer = setTimeout(flushBatch, BATCH_INTERVAL_MS);
+      }
+
+      // Also flush if batch gets too large (safety limit)
+      if (eventBatch.length >= 100) {
+        flushBatch();
+      }
     }
   });
 

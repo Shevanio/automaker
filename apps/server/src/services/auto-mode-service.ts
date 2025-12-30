@@ -20,6 +20,7 @@ import {
 } from '@automaker/utils';
 import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
+import { resolveWorktreePath } from '@automaker/git-utils';
 import {
   getFeatureDir,
   getAutomakerDir,
@@ -569,24 +570,20 @@ export class AutoModeService {
 
       // Derive workDir from feature.branchName
       // Worktrees should already be created when the feature is added/edited
-      let worktreePath: string | null = null;
       const branchName = feature.branchName;
 
-      if (useWorktrees && branchName) {
-        // Try to find existing worktree for this branch
-        // Worktree should already exist (created when feature was added/edited)
-        worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
+      // Use centralized worktree resolution
+      const { workDir, worktreePath } = await resolveWorktreePath(
+        projectPath,
+        branchName,
+        useWorktrees
+      );
 
-        if (worktreePath) {
-          logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
-        } else {
-          // Worktree doesn't exist - log warning and continue with project path
-          logger.warn(`Worktree for branch "${branchName}" not found, using project path`);
-        }
+      if (worktreePath) {
+        logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
+      } else if (useWorktrees && branchName) {
+        logger.warn(`Worktree for branch "${branchName}" not found, using project path`);
       }
-
-      // Ensure workDir is always an absolute path for cross-platform compatibility
-      const workDir = worktreePath ? path.resolve(worktreePath) : path.resolve(projectPath);
 
       // Validate that working directory is allowed using centralized validation
       validateWorkingDirectory(workDir);
@@ -978,18 +975,17 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
     // Derive workDir from feature.branchName
     // If no branchName, derive from feature ID: feature/{featureId}
-    let workDir = path.resolve(projectPath);
-    let worktreePath: string | null = null;
     const branchName = feature?.branchName || `feature/${featureId}`;
 
-    if (useWorktrees && branchName) {
-      // Try to find existing worktree for this branch
-      worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
+    // Use centralized worktree resolution
+    const { workDir, worktreePath } = await resolveWorktreePath(
+      projectPath,
+      branchName,
+      useWorktrees
+    );
 
-      if (worktreePath) {
-        workDir = worktreePath;
-        logger.info(`Follow-up using worktree for branch "${branchName}": ${workDir}`);
-      }
+    if (worktreePath) {
+      logger.info(`Follow-up using worktree for branch "${branchName}": ${workDir}`);
     }
 
     // Load previous agent output if it exists
@@ -1663,58 +1659,6 @@ Format your response as a structured markdown document.`;
   }
 
   // Private helpers
-
-  /**
-   * Find an existing worktree for a given branch by checking git worktree list
-   */
-  private async findExistingWorktreeForBranch(
-    projectPath: string,
-    branchName: string
-  ): Promise<string | null> {
-    try {
-      const { stdout } = await execAsync('git worktree list --porcelain', {
-        cwd: projectPath,
-      });
-
-      const lines = stdout.split('\n');
-      let currentPath: string | null = null;
-      let currentBranch: string | null = null;
-
-      for (const line of lines) {
-        if (line.startsWith('worktree ')) {
-          currentPath = line.slice(9);
-        } else if (line.startsWith('branch ')) {
-          currentBranch = line.slice(7).replace('refs/heads/', '');
-        } else if (line === '' && currentPath && currentBranch) {
-          // End of a worktree entry
-          if (currentBranch === branchName) {
-            // Resolve to absolute path - git may return relative paths
-            // On Windows, this is critical for cwd to work correctly
-            // On all platforms, absolute paths ensure consistent behavior
-            const resolvedPath = path.isAbsolute(currentPath)
-              ? path.resolve(currentPath)
-              : path.resolve(projectPath, currentPath);
-            return resolvedPath;
-          }
-          currentPath = null;
-          currentBranch = null;
-        }
-      }
-
-      // Check the last entry (if file doesn't end with newline)
-      if (currentPath && currentBranch && currentBranch === branchName) {
-        // Resolve to absolute path for cross-platform compatibility
-        const resolvedPath = path.isAbsolute(currentPath)
-          ? path.resolve(currentPath)
-          : path.resolve(projectPath, currentPath);
-        return resolvedPath;
-      }
-
-      return null;
-    } catch {
-      return null;
-    }
-  }
 
   private async loadFeature(projectPath: string, featureId: string): Promise<Feature | null> {
     // Features are stored in .automaker directory

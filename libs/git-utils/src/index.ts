@@ -17,3 +17,6 @@ export {
   generateDiffsForNonGitDirectory,
   getGitRepositoryDiffs,
 } from './diff.js';
+
+// Export worktree utilities
+export { findWorktreeForBranch, resolveWorktreePath } from './worktree.js';

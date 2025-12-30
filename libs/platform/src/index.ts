@@ -43,6 +43,7 @@ export {
   getAllowedRootDirectory,
   getDataDirectory,
   getAllowedPaths,
+  sanitizeFilename,
 } from './security.js';
 
 // Secure file system (validates paths before I/O operations)

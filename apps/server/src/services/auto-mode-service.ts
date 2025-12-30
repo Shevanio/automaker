@@ -19,7 +19,12 @@ import {
 } from '@automaker/utils';
 import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
-import { getFeatureDir, getAutomakerDir, getFeaturesDir } from '@automaker/platform';
+import {
+  getFeatureDir,
+  getAutomakerDir,
+  getFeaturesDir,
+  sanitizeFilename,
+} from '@automaker/platform';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
@@ -1068,15 +1073,9 @@ Address the follow-up instructions above. Review the previous work and make the 
         for (const imagePath of imagePaths) {
           try {
             // SECURITY: Validate filename to prevent path traversal
-            const filename = path.basename(imagePath);
-
-            // Reject filenames with path traversal patterns
-            if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-              console.warn(
-                `[AutoMode] SECURITY: Rejecting unsafe image filename: ${filename} from path: ${imagePath}`
-              );
-              continue;
-            }
+            // SECURITY: Sanitize filename to prevent path traversal and validate extension
+            const rawFilename = path.basename(imagePath);
+            const filename = sanitizeFilename(rawFilename);
 
             // Only allow common image extensions
             const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];

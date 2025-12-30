@@ -12,6 +12,7 @@ import {
   getFeatureDir,
   getFeatureImagesDir,
   ensureAutomakerDir,
+  sanitizeFilename,
 } from '@automaker/platform';
 
 const logger = createLogger('FeatureLoader');
@@ -106,7 +107,8 @@ export class FeatureLoader {
         }
 
         // Get filename and create new path in external storage
-        const filename = path.basename(originalPath);
+        // SECURITY: Sanitize filename to prevent path traversal attacks
+        const filename = sanitizeFilename(path.basename(originalPath));
         const newPath = path.join(featureImagesDir, filename);
 
         // Copy the file

@@ -44,9 +44,22 @@ ${addedLines}
 
 /**
  * Generate a synthetic unified diff for an untracked (new) file
- * This is needed because `git diff HEAD` doesn't include untracked files
  *
- * If the path is a directory, this will recursively generate diffs for all files inside
+ * This is needed because `git diff HEAD` doesn't include untracked files.
+ * If the path is a directory, this will recursively generate diffs for all files inside.
+ *
+ * @param basePath - The base directory path (usually the git repository root)
+ * @param relativePath - Path relative to basePath
+ * @returns Unified diff string in git diff format
+ * @throws Error if file cannot be read
+ * @example
+ * ```typescript
+ * const diff = await generateSyntheticDiffForNewFile(
+ *   '/path/to/repo',
+ *   'src/newfile.ts'
+ * );
+ * console.log(diff); // Shows additions with + prefix
+ * ```
  */
 export async function generateSyntheticDiffForNewFile(
   basePath: string,
@@ -243,7 +256,21 @@ export async function generateDiffsForNonGitDirectory(
 
 /**
  * Get git repository diffs for a given path
- * Handles both git repos and non-git directories
+ *
+ * Handles both git repos and non-git directories. For git repos, returns
+ * staged and unstaged changes. For non-git directories, treats all files as new.
+ *
+ * @param repoPath - Absolute path to the git repository or directory
+ * @returns Object containing unified diff string, file status array, and hasChanges flag
+ * @throws Error if directory cannot be read
+ * @example
+ * ```typescript
+ * const { diff, files, hasChanges } = await getGitRepositoryDiffs('/path/to/repo');
+ * if (hasChanges) {
+ *   console.log(`Found ${files.length} changed files`);
+ *   console.log(diff); // Full unified diff
+ * }
+ * ```
  */
 export async function getGitRepositoryDiffs(
   repoPath: string

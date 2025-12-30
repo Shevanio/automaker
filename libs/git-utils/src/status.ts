@@ -47,6 +47,16 @@ function getStatusText(indexStatus: string, workTreeStatus: string): string {
 
 /**
  * Check if a path is a git repository
+ *
+ * @param repoPath - Absolute path to the directory to check
+ * @returns Promise that resolves to true if the path is inside a git work tree
+ * @example
+ * ```typescript
+ * const isRepo = await isGitRepo('/path/to/project');
+ * if (isRepo) {
+ *   console.log('This is a git repository');
+ * }
+ * ```
  */
 export async function isGitRepo(repoPath: string): Promise<boolean> {
   try {
@@ -59,8 +69,20 @@ export async function isGitRepo(repoPath: string): Promise<boolean> {
 
 /**
  * Parse the output of `git status --porcelain` into FileStatus array
+ *
  * Git porcelain format: XY PATH where X=staging area status, Y=working tree status
  * For renamed files: XY ORIG_PATH -> NEW_PATH
+ *
+ * @param statusOutput - Raw output from `git status --porcelain` command
+ * @returns Array of file status objects with path, status, and human-readable status text
+ * @example
+ * ```typescript
+ * const { stdout } = await execAsync('git status --porcelain');
+ * const files = parseGitStatus(stdout);
+ * files.forEach(file => {
+ *   console.log(`${file.path}: ${file.statusText}`);
+ * });
+ * ```
  */
 export function parseGitStatus(statusOutput: string): FileStatus[] {
   return statusOutput

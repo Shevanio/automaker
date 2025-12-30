@@ -11,9 +11,19 @@ const execAsync = promisify(exec);
 
 /**
  * Find the worktree path for a specific branch
+ *
  * @param projectPath - The main project repository path
  * @param branchName - The branch name to find worktree for
  * @returns The absolute path to the worktree, or null if not found
+ * @example
+ * ```typescript
+ * const worktreePath = await findWorktreeForBranch('/path/to/repo', 'feature/my-feature');
+ * if (worktreePath) {
+ *   console.log(`Worktree found at: ${worktreePath}`);
+ * } else {
+ *   console.log('No worktree found for this branch');
+ * }
+ * ```
  */
 export async function findWorktreeForBranch(
   projectPath: string,
@@ -58,12 +68,26 @@ export async function findWorktreeForBranch(
 
 /**
  * Resolve worktree path with fallback to project path
- * Utility function that combines worktree lookup with fallback behavior
+ *
+ * Utility function that combines worktree lookup with fallback behavior.
+ * If worktree is found, uses that path. Otherwise, falls back to the main project path.
  *
  * @param projectPath - The main project repository path
  * @param branchName - The branch name to find worktree for (null/undefined to skip worktree lookup)
  * @param useWorktrees - Whether to attempt worktree resolution
  * @returns Object containing the resolved working directory and worktree path (if found)
+ * @example
+ * ```typescript
+ * const { workDir, worktreePath } = await resolveWorktreePath(
+ *   '/path/to/repo',
+ *   'feature/my-feature',
+ *   true
+ * );
+ * console.log(`Working directory: ${workDir}`);
+ * if (worktreePath) {
+ *   console.log(`Using worktree at: ${worktreePath}`);
+ * }
+ * ```
  */
 export async function resolveWorktreePath(
   projectPath: string,

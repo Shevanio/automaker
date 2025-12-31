@@ -63,6 +63,11 @@ log_success "Packages built"
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 log_info "Local IP detected: ${LOCAL_IP}"
 
+# Step 4.5: Configure CORS for network access
+log_info "Configuring CORS for network access..."
+export CORS_ORIGIN="http://${LOCAL_IP}:3007,http://localhost:3007,http://127.0.0.1:3007"
+log_success "CORS configured for: localhost, 127.0.0.1, ${LOCAL_IP}"
+
 # Step 5: Start backend and frontend concurrently
 log_info "Starting backend (port 3008) and frontend (port 3007)..."
 echo ""

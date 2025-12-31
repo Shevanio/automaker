@@ -58,6 +58,11 @@ log_success "Packages built"
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 log_info "Local IP: ${LOCAL_IP}"
 
+# Configure CORS for network access
+log_info "Configuring CORS for network access..."
+export CORS_ORIGIN="http://${LOCAL_IP}:3007,http://localhost:3007,http://127.0.0.1:3007"
+log_success "CORS configured for: localhost, 127.0.0.1, ${LOCAL_IP}"
+
 echo ""
 log_info "Starting Backend (port 3008)..."
 npm run _dev:server > backend.log 2>&1 &

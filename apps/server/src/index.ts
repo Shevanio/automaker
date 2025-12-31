@@ -9,6 +9,7 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import cookie from 'cookie';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -117,38 +118,54 @@ if (ENABLE_REQUEST_LOGGING) {
     })
   );
 }
-// CORS configuration
-// When using credentials (cookies), origin cannot be '*'
-// We dynamically allow the requesting origin for local development
+// SECURITY: Restrict CORS to localhost UI origins to prevent drive-by attacks
+// from malicious websites. MCP server endpoints can execute arbitrary commands,
+// so allowing any origin would enable RCE from any website visited while Automaker runs.
+const DEFAULT_CORS_ORIGINS = ['http://localhost:3007', 'http://127.0.0.1:3007'];
+
+// SECURITY: Validate CORS_ORIGIN against whitelist
+// Allow localhost and private network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+function validateCorsOrigin(origin: string | string[] | undefined): string | string[] {
+  if (!origin) {
+    return DEFAULT_CORS_ORIGINS;
+  }
+
+  // Normalize to array - split by comma or space if string
+  const origins = Array.isArray(origin) ? origin : origin.split(/[,\s]+/).filter(Boolean);
+
+  // Whitelist: allow localhost and private network IPs
+  const ALLOWED_PATTERNS = [
+    /^https?:\/\/localhost(:\d+)?$/,
+    /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+    /^https?:\/\/\[::1\](:\d+)?$/, // IPv6 localhost
+    /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/, // Private network 192.168.x.x
+    /^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/, // Private network 10.x.x.x
+    /^https?:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$/, // Private network 172.16-31.x.x
+    /^https?:\/\/0\.0\.0\.0(:\d+)?$/, // Allow 0.0.0.0 for network binding
+  ];
+
+  const validOrigins = origins.filter((o) => {
+    const matches = ALLOWED_PATTERNS.some((pattern) => pattern.test(o));
+    if (!matches) {
+      logger.warn(`[Security] Rejecting invalid CORS origin: ${o}`);
+    }
+    return matches;
+  });
+
+  if (validOrigins.length === 0) {
+    logger.warn('[Security] No valid CORS origins found in CORS_ORIGIN env var, using defaults');
+    return DEFAULT_CORS_ORIGINS;
+  }
+
+  return validOrigins.length === 1 ? validOrigins[0] : validOrigins;
+}
+
+const corsOrigin = validateCorsOrigin(process.env.CORS_ORIGIN);
+logger.info('[Security] CORS origins configured:', corsOrigin);
+
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, Electron)
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-
-      // If CORS_ORIGIN is set, use it (can be comma-separated list)
-      const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim());
-      if (allowedOrigins && allowedOrigins.length > 0 && allowedOrigins[0] !== '*') {
-        if (allowedOrigins.includes(origin)) {
-          callback(null, origin);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-        return;
-      }
-
-      // For local development, allow localhost origins
-      if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-        callback(null, origin);
-        return;
-      }
-
-      // Reject other origins by default for security
-      callback(new Error('Not allowed by CORS'));
-    },
+    origin: corsOrigin,
     credentials: true,
   })
 );
@@ -223,8 +240,10 @@ app.use('/api/fs', createFsRoutes(events));
 app.use('/api/agent', agentLimiter, createAgentRoutes(agentService, events));
 app.use('/api/sessions', createSessionsRoutes(agentService));
 app.use('/api/features', createFeaturesRoutes(featureLoader));
-app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
-app.use('/api/enhance-prompt', createEnhancePromptRoutes(settingsService));
+// Apply stricter rate limiting to auto-mode (uses AI agent internally)
+app.use('/api/auto-mode', agentLimiter, createAutoModeRoutes(autoModeService));
+// Apply stricter rate limiting to AI-powered endpoints
+app.use('/api/enhance-prompt', agentLimiter, createEnhancePromptRoutes(settingsService));
 app.use('/api/worktree', createWorktreeRoutes());
 app.use('/api/git', createGitRoutes());
 app.use('/api/setup', createSetupRoutes());

@@ -91,6 +91,13 @@ interface PlanSpec {
   tasks?: ParsedTask[];
 }
 
+// Regular expressions for parsing tasks from spec content
+const REGEX_TASKS_BLOCK = /```tasks\s*([\s\S]*?)```/;
+const REGEX_TASK_LINE_FALLBACK = /^- \[ \] T\d+:.+$/gm;
+const REGEX_PHASE_HEADER = /^##\s*(.+)$/;
+const REGEX_TASK_WITH_FILE = /^- \[ \] (T\d+):\s*(.+?)\s*\|\s*File:\s*(.+)$/;
+const REGEX_TASK_SIMPLE = /^- \[ \] (T\d+):\s*(.+)$/;
+
 /**
  * Parse tasks from generated spec content
  * Looks for the ```tasks code block and extracts task lines

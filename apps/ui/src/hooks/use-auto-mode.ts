@@ -101,9 +101,16 @@ export function useAutoMode() {
           break;
 
         case 'auto_mode_feature_complete':
-          // Feature completed - remove from running tasks and UI will reload features on its own
+          // Feature completed - remove from running tasks and update status
           if (event.featureId) {
-            console.log('[AutoMode] Feature completed:', event.featureId, 'passes:', event.passes);
+            console.log(
+              '[AutoMode] Feature completed:',
+              event.featureId,
+              'passes:',
+              event.passes,
+              'status:',
+              event.status
+            );
             removeRunningTask(eventProjectId, event.featureId);
             addAutoModeActivity({
               featureId: event.featureId,
@@ -113,6 +120,15 @@ export function useAutoMode() {
                 : 'Feature completed with failures',
               passes: event.passes,
             });
+
+            // Update feature status if provided
+            if (event.status) {
+              const { updateFeature } = useAppStore.getState();
+              updateFeature(event.featureId, {
+                status: event.status as any,
+                updatedAt: new Date().toISOString(),
+              });
+            }
           }
           break;
 

@@ -573,6 +573,7 @@ export class AutoModeService {
           (Date.now() - tempRunningFeature.startTime) / 1000
         )}s${finalStatus === 'verified' ? ' - auto-verified' : ''}`,
         projectPath,
+        status: finalStatus,
       });
     } catch (error) {
       const errorInfo = classifyError(error);
@@ -583,6 +584,7 @@ export class AutoModeService {
           passes: false,
           message: 'Feature stopped by user',
           projectPath,
+          status: 'backlog', // When stopped, move back to backlog
         });
       } else {
         logger.error('Feature execution failed', {
@@ -1050,6 +1052,7 @@ Address the follow-up instructions above. Review the previous work and make the 
         passes: true,
         message: `Follow-up completed successfully${finalStatus === 'verified' ? ' - auto-verified' : ''}`,
         projectPath,
+        status: finalStatus,
       });
     } catch (error) {
       const errorInfo = classifyError(error);

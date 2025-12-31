@@ -189,6 +189,7 @@ export type AutoModeEvent =
       projectPath?: string;
       passes: boolean;
       message: string;
+      status?: string;
     }
   | {
       type: 'pipeline_step_started';

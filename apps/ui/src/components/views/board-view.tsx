@@ -461,6 +461,39 @@ export function BoardView() {
     currentWorktreeBranch,
   });
 
+  // Wrap handleStartImplementation to add optimistic UI update
+  const wrappedHandleStartImplementation = useCallback(
+    async (feature: Feature): Promise<boolean> => {
+      // Add to running tasks immediately for instant UI feedback
+      autoMode.addToRunningTasks(feature.id);
+      try {
+        const result = await handleStartImplementation(feature);
+        return result;
+      } catch (error) {
+        // If it fails, remove from running tasks
+        autoMode.removeFromRunningTasks(feature.id);
+        throw error;
+      }
+    },
+    [handleStartImplementation, autoMode]
+  );
+
+  // Wrap handleResumeFeature to add optimistic UI update
+  const wrappedHandleResumeFeature = useCallback(
+    async (feature: Feature) => {
+      // Add to running tasks immediately for instant UI feedback
+      autoMode.addToRunningTasks(feature.id);
+      try {
+        await handleResumeFeature(feature);
+      } catch (error) {
+        // If it fails, remove from running tasks
+        autoMode.removeFromRunningTasks(feature.id);
+        throw error;
+      }
+    },
+    [handleResumeFeature, autoMode]
+  );
+
   // Handler for addressing PR comments - creates a feature and starts it automatically
   const handleAddressPRComments = useCallback(
     async (worktree: WorktreeInfo, prInfo: PRInfo) => {
@@ -828,7 +861,7 @@ export function BoardView() {
     currentProject,
     runningAutoTasks,
     persistFeatureUpdate,
-    handleStartImplementation,
+    handleStartImplementation: wrappedHandleStartImplementation,
   });
 
   // Use column features hook
@@ -1100,14 +1133,14 @@ export function BoardView() {
             onDelete={(featureId) => handleDeleteFeature(featureId)}
             onViewOutput={handleViewOutput}
             onVerify={handleVerifyFeature}
-            onResume={handleResumeFeature}
+            onResume={wrappedHandleResumeFeature}
             onForceStop={handleForceStopFeature}
             onManualVerify={handleManualVerify}
             onMoveBackToInProgress={handleMoveBackToInProgress}
             onFollowUp={handleOpenFollowUp}
             onCommit={handleCommitFeature}
             onComplete={handleCompleteFeature}
-            onImplement={handleStartImplementation}
+            onImplement={wrappedHandleStartImplementation}
             onViewPlan={(feature) => setViewPlanFeature(feature)}
             onApprovePlan={handleOpenApprovalDialog}
             onSpawnTask={(feature) => {
@@ -1137,9 +1170,9 @@ export function BoardView() {
             onSearchQueryChange={setSearchQuery}
             onEditFeature={(feature) => setEditingFeature(feature)}
             onViewOutput={handleViewOutput}
-            onStartTask={handleStartImplementation}
+            onStartTask={wrappedHandleStartImplementation}
             onStopTask={handleForceStopFeature}
-            onResumeTask={handleResumeFeature}
+            onResumeTask={wrappedHandleResumeFeature}
             onUpdateFeature={updateFeature}
             onSpawnTask={(feature) => {
               setSpawnParentFeature(feature);

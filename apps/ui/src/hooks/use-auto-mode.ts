@@ -403,6 +403,24 @@ export function useAutoMode() {
     [currentProject, removeRunningTask, addAutoModeActivity]
   );
 
+  // Helper to add a feature to running tasks (optimistic update)
+  const addToRunningTasks = useCallback(
+    (featureId: string) => {
+      if (!projectId) return;
+      addRunningTask(projectId, featureId);
+    },
+    [projectId, addRunningTask]
+  );
+
+  // Helper to remove a feature from running tasks (on error/cancel)
+  const removeFromRunningTasks = useCallback(
+    (featureId: string) => {
+      if (!projectId) return;
+      removeRunningTask(projectId, featureId);
+    },
+    [projectId, removeRunningTask]
+  );
+
   return {
     isRunning: isAutoModeRunning,
     runningTasks: runningAutoTasks,
@@ -411,5 +429,7 @@ export function useAutoMode() {
     start,
     stop,
     stopFeature,
+    addToRunningTasks,
+    removeFromRunningTasks,
   };
 }

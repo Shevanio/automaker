@@ -13,6 +13,7 @@ import rateLimit from 'express-rate-limit';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
+import os from 'os';
 import { createLogger } from '@automaker/utils';
 
 const logger = createLogger('Server');
@@ -610,12 +611,13 @@ const startServer = (port: number) => {
     const portStr = port.toString().padEnd(4);
 
     // Get local IP for network access info
-    const os = require('os');
     const interfaces = os.networkInterfaces();
     let localIP = 'localhost';
 
     for (const name of Object.keys(interfaces)) {
-      for (const iface of interfaces[name]) {
+      const ifaceList = interfaces[name];
+      if (!ifaceList) continue;
+      for (const iface of ifaceList) {
         if (iface.family === 'IPv4' && !iface.internal) {
           localIP = iface.address;
           break;

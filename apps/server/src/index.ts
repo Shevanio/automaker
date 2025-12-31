@@ -189,6 +189,13 @@ const agentLimiter = rateLimit({
   message: 'Too many AI agent requests. Please wait before starting new conversations.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for read-only operations
+  skip: (req) => {
+    // Allow status checks and context queries without strict limiting
+    const isReadOnly =
+      req.path.includes('/status') || req.path.includes('/context-exists') || req.method === 'GET';
+    return isReadOnly;
+  },
 });
 
 // Apply general rate limiter to all routes

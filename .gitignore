@@ -1,5 +1,5 @@
 #added by trueheads > will remove once supercombo adds multi-os support
-launch.sh
+# Removed launch.sh from gitignore - now using official launch scripts
 
 # Dependencies
 node_modules/

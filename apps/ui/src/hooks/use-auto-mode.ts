@@ -123,11 +123,20 @@ export function useAutoMode() {
 
             // Update feature status if provided
             if (event.status) {
-              const { updateFeature } = useAppStore.getState();
+              console.log('[AutoMode] Updating feature status to:', event.status);
+              const { updateFeature, features } = useAppStore.getState();
+              const featureBefore = features.find((f) => f.id === event.featureId);
+              console.log('[AutoMode] Feature before update:', featureBefore?.status);
+
               updateFeature(event.featureId, {
                 status: event.status as any,
                 updatedAt: new Date().toISOString(),
               });
+
+              const featuresAfter = useAppStore.getState().features;
+              const featureAfter = featuresAfter.find((f) => f.id === event.featureId);
+              console.log('[AutoMode] Feature after update:', featureAfter?.status);
+              console.log('[AutoMode] Total features in store:', featuresAfter.length);
             }
           }
           break;

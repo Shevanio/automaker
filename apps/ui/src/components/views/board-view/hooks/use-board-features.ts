@@ -189,9 +189,16 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
       const eventProjectId = ('projectId' in event && event.projectId) || projectId;
 
       if (event.type === 'auto_mode_feature_complete') {
-        // Reload features when a feature is completed
-        console.log('[Board] Feature completed, reloading features...');
-        loadFeatures();
+        // Feature completed - DO NOT reload all features from backend
+        // The status update is handled by feature_status_changed event in use-auto-mode.ts
+        // We only reload if the event doesn't include status (backward compatibility)
+        console.log('[Board] Feature completed');
+
+        if (!('status' in event) || !event.status) {
+          console.log('[Board] No status in completion event, reloading features...');
+          loadFeatures();
+        }
+
         // Play ding sound when feature is done (unless muted)
         const { muteDoneSound } = useAppStore.getState();
         if (!muteDoneSound) {

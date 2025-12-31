@@ -8,6 +8,8 @@ export {
   isAbortError,
   isCancellationError,
   isAuthenticationError,
+  isRateLimitError,
+  extractRetryAfter,
   classifyError,
   getUserFriendlyErrorMessage,
   getErrorMessage,

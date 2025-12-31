@@ -106,6 +106,8 @@ export interface RunningAgent {
   projectPath: string;
   projectName: string;
   isAutoMode: boolean;
+  title?: string;
+  description?: string;
 }
 
 export interface RunningAgentsResult {
@@ -429,6 +431,7 @@ export interface SaveImageResult {
 
 export interface ElectronAPI {
   ping: () => Promise<string>;
+  getApiKey?: () => Promise<string | null>;
   openExternalLink: (url: string) => Promise<{ success: boolean; error?: string }>;
   openDirectory: () => Promise<DialogResult>;
   openFile: (options?: object) => Promise<DialogResult>;
@@ -2687,6 +2690,8 @@ function createMockRunningAgentsAPI(): RunningAgentsAPI {
         projectPath: '/mock/project',
         projectName: 'Mock Project',
         isAutoMode: mockAutoModeRunning,
+        title: `Mock Feature Title for ${featureId}`,
+        description: 'This is a mock feature description for testing purposes.',
       }));
       return {
         success: true,

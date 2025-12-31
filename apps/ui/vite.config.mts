@@ -61,6 +61,7 @@ export default defineConfig(({ command }) => {
     },
     server: {
       port: parseInt(process.env.TEST_PORT || '3007', 10),
+      host: '0.0.0.0', // Permite acceso desde cualquier IP de la red
     },
     build: {
       outDir: 'dist',

@@ -119,7 +119,7 @@ if (ENABLE_REQUEST_LOGGING) {
 const DEFAULT_CORS_ORIGINS = ['http://localhost:3007', 'http://127.0.0.1:3007'];
 
 // SECURITY: Validate CORS_ORIGIN against whitelist
-// Only allow localhost origins to prevent CORS bypass attacks
+// Allow localhost and private network IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
 function validateCorsOrigin(origin: string | string[] | undefined): string | string[] {
   if (!origin) {
     return DEFAULT_CORS_ORIGINS;
@@ -128,11 +128,15 @@ function validateCorsOrigin(origin: string | string[] | undefined): string | str
   // Normalize to array
   const origins = Array.isArray(origin) ? origin : [origin];
 
-  // Whitelist: only allow localhost/127.0.0.1 origins
+  // Whitelist: allow localhost and private network IPs
   const ALLOWED_PATTERNS = [
     /^https?:\/\/localhost(:\d+)?$/,
     /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
     /^https?:\/\/\[::1\](:\d+)?$/, // IPv6 localhost
+    /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/, // Private network 192.168.x.x
+    /^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/, // Private network 10.x.x.x
+    /^https?:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$/, // Private network 172.16-31.x.x
+    /^https?:\/\/0\.0\.0\.0(:\d+)?$/, // Allow 0.0.0.0 for network binding
   ];
 
   const validOrigins = origins.filter((o) => {
@@ -597,21 +601,38 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
 
 // Start server with error handling for port conflicts
 const startServer = (port: number) => {
-  server.listen(port, () => {
+  server.listen(port, '0.0.0.0', () => {
     const terminalStatus = isTerminalEnabled()
       ? isTerminalPasswordRequired()
         ? 'enabled (password protected)'
         : 'enabled'
       : 'disabled';
     const portStr = port.toString().padEnd(4);
+
+    // Get local IP for network access info
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+    let localIP = 'localhost';
+
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name]) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          localIP = iface.address;
+          break;
+        }
+      }
+      if (localIP !== 'localhost') break;
+    }
+
     logger.info(`
 ╔═══════════════════════════════════════════════════════╗
 ║           Automaker Backend Server                    ║
 ╠═══════════════════════════════════════════════════════╣
-║  HTTP API:    http://localhost:${portStr}                 ║
-║  WebSocket:   ws://localhost:${portStr}/api/events        ║
-║  Terminal:    ws://localhost:${portStr}/api/terminal/ws   ║
-║  Health:      http://localhost:${portStr}/api/health      ║
+║  Local:       http://localhost:${portStr}                 ║
+║  Network:     http://${localIP}:${portStr}           ║
+║  WebSocket:   ws://${localIP}:${portStr}/api/events       ║
+║  Terminal:    ws://${localIP}:${portStr}/api/terminal/ws  ║
+║  Health:      http://${localIP}:${portStr}/api/health     ║
 ║  Terminal:    ${terminalStatus.padEnd(37)}║
 ╚═══════════════════════════════════════════════════════╝
 `);

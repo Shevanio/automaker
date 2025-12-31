@@ -109,9 +109,28 @@ export function useAutoMode() {
               'passes:',
               event.passes,
               'status:',
-              event.status
+              event.status,
+              'eventProjectId:',
+              eventProjectId
             );
+
+            // Log running tasks before removal
+            const runningBefore =
+              useAppStore.getState().autoModeByProject[eventProjectId]?.runningTasks || [];
+            console.log('[AutoMode] Running tasks before removal:', runningBefore);
+            console.log(
+              '[AutoMode] Is feature in running tasks?',
+              runningBefore.includes(event.featureId)
+            );
+
             removeRunningTask(eventProjectId, event.featureId);
+
+            // Log running tasks after removal
+            const runningAfter =
+              useAppStore.getState().autoModeByProject[eventProjectId]?.runningTasks || [];
+            console.log('[AutoMode] Running tasks after removal:', runningAfter);
+            console.log('[AutoMode] Was feature removed?', !runningAfter.includes(event.featureId));
+
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'complete',
@@ -293,13 +312,22 @@ export function useAutoMode() {
         case 'feature_status_changed':
           // Feature status changed - update the feature in the store
           if (event.featureId && event.status) {
-            console.log(`[AutoMode] Feature status changed: ${event.featureId} -> ${event.status}`);
-            // Update the feature status in the store
-            const { updateFeature } = useAppStore.getState();
+            console.log(
+              `[AutoMode] >>> feature_status_changed event: ${event.featureId} -> ${event.status}`
+            );
+            const { updateFeature, features } = useAppStore.getState();
+            const featureBefore = features.find((f) => f.id === event.featureId);
+            console.log('[AutoMode] Status before:', featureBefore?.status);
+
             updateFeature(event.featureId, {
               status: event.status as any,
               updatedAt: event.updatedAt,
             });
+
+            const featureAfter = useAppStore
+              .getState()
+              .features.find((f) => f.id === event.featureId);
+            console.log('[AutoMode] Status after:', featureAfter?.status);
           }
           break;
 

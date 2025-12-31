@@ -126,8 +126,8 @@ function validateCorsOrigin(origin: string | string[] | undefined): string | str
     return DEFAULT_CORS_ORIGINS;
   }
 
-  // Normalize to array
-  const origins = Array.isArray(origin) ? origin : [origin];
+  // Normalize to array - split by comma or space if string
+  const origins = Array.isArray(origin) ? origin : origin.split(/[,\s]+/).filter(Boolean);
 
   // Whitelist: allow localhost and private network IPs
   const ALLOWED_PATTERNS = [

@@ -61,8 +61,8 @@ export CORS_ORIGIN="http://192.168.1.100:3007"
 # Opción 2: Archivo .env
 echo "CORS_ORIGIN=http://192.168.1.100:3007" >> .env
 
-# Múltiples IPs
-export CORS_ORIGIN="http://192.168.1.100:3007,http://192.168.1.101:3007"
+# Múltiples IPs (separadas por espacios)
+export CORS_ORIGIN="http://192.168.1.100:3007 http://192.168.1.101:3007"
 ```
 
 Luego inicia el servidor:

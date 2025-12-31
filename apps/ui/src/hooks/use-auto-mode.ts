@@ -101,7 +101,8 @@ export function useAutoMode() {
           break;
 
         case 'auto_mode_feature_complete':
-          // Feature completed - remove from running tasks and update status
+          // Feature completed - update status FIRST, then remove from running tasks
+          // This ensures the feature has the correct status before React re-renders
           if (event.featureId) {
             console.log(
               '[AutoMode] Feature completed:',
@@ -114,6 +115,27 @@ export function useAutoMode() {
               eventProjectId
             );
 
+            // CRITICAL: Update feature status FIRST (before removing from running tasks)
+            // This ensures when we remove from runningTasks and useBoardColumnFeatures
+            // re-calculates, the feature already has its final status
+            if (event.status) {
+              console.log('[AutoMode] Updating feature status to:', event.status);
+              const { updateFeature, features } = useAppStore.getState();
+              const featureBefore = features.find((f) => f.id === event.featureId);
+              console.log('[AutoMode] Feature before update:', featureBefore?.status);
+
+              updateFeature(event.featureId, {
+                status: event.status as any,
+                updatedAt: new Date().toISOString(),
+              });
+
+              const featuresAfter = useAppStore.getState().features;
+              const featureAfter = featuresAfter.find((f) => f.id === event.featureId);
+              console.log('[AutoMode] Feature after update:', featureAfter?.status);
+              console.log('[AutoMode] Total features in store:', featuresAfter.length);
+            }
+
+            // NOW remove from running tasks (after status is updated)
             // Log running tasks before removal
             const runningBefore =
               useAppStore.getState().autoModeByProject[eventProjectId]?.runningTasks || [];
@@ -139,24 +161,6 @@ export function useAutoMode() {
                 : 'Feature completed with failures',
               passes: event.passes,
             });
-
-            // Update feature status if provided
-            if (event.status) {
-              console.log('[AutoMode] Updating feature status to:', event.status);
-              const { updateFeature, features } = useAppStore.getState();
-              const featureBefore = features.find((f) => f.id === event.featureId);
-              console.log('[AutoMode] Feature before update:', featureBefore?.status);
-
-              updateFeature(event.featureId, {
-                status: event.status as any,
-                updatedAt: new Date().toISOString(),
-              });
-
-              const featuresAfter = useAppStore.getState().features;
-              const featureAfter = featuresAfter.find((f) => f.id === event.featureId);
-              console.log('[AutoMode] Feature after update:', featureAfter?.status);
-              console.log('[AutoMode] Total features in store:', featuresAfter.length);
-            }
           }
           break;
 

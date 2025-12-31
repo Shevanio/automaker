@@ -297,6 +297,13 @@ export type AutoModeEvent =
       featureId: string;
       projectPath?: string;
       phaseNumber: number;
+    }
+  | {
+      type: 'feature_status_changed';
+      featureId: string;
+      status: string;
+      updatedAt?: string;
+      projectPath?: string;
     };
 
 export type SpecRegenerationEvent =

@@ -1617,6 +1617,13 @@ Format your response as a structured markdown document.`;
         feature.justFinishedAt = undefined;
       }
       await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
+
+      // Emit event to notify frontend of status change
+      this.emitAutoModeEvent('feature_status_changed', {
+        featureId,
+        status,
+        updatedAt: feature.updatedAt,
+      });
     } catch {
       // Feature file may not exist
     }

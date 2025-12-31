@@ -265,6 +265,19 @@ export function useAutoMode() {
           }
           break;
 
+        case 'feature_status_changed':
+          // Feature status changed - update the feature in the store
+          if (event.featureId && event.status) {
+            console.log(`[AutoMode] Feature status changed: ${event.featureId} -> ${event.status}`);
+            // Update the feature status in the store
+            const { updateFeature } = useAppStore.getState();
+            updateFeature(event.featureId, {
+              status: event.status as any,
+              updatedAt: event.updatedAt,
+            });
+          }
+          break;
+
         case 'auto_mode_task_started':
           // Task started - show which task is being worked on
           if (event.featureId && 'taskId' in event && 'taskDescription' in event) {

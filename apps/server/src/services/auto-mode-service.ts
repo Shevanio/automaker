@@ -2713,17 +2713,10 @@ Begin implementing task ${task.id} now.`;
    */
   private emitAutoModeEvent(eventType: string, data: Record<string, unknown>): void {
     // Wrap the event in auto-mode:event format expected by the client
-    const event = {
+    this.events.emit('auto-mode:event', {
       type: eventType,
       ...data,
-    };
-
-    // Debug log for completion events
-    if (eventType === 'auto_mode_feature_complete') {
-      logger.info('[AutoMode] 🚀 Emitting completion event:', event);
-    }
-
-    this.events.emit('auto-mode:event', event);
+    });
   }
 
   private sleep(ms: number, signal?: AbortSignal): Promise<void> {

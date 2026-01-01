@@ -101,58 +101,10 @@ export function useAutoMode() {
           break;
 
         case 'auto_mode_feature_complete':
-          // Feature completed - update status FIRST, then remove from running tasks
-          // This ensures the feature has the correct status before React re-renders
+          // Feature completed - remove from running tasks and UI will reload features on its own
           if (event.featureId) {
-            console.log(
-              '[AutoMode] Feature completed:',
-              event.featureId,
-              'passes:',
-              event.passes,
-              'status:',
-              event.status,
-              'eventProjectId:',
-              eventProjectId
-            );
-
-            // CRITICAL: Update feature status FIRST (before removing from running tasks)
-            // This ensures when we remove from runningTasks and useBoardColumnFeatures
-            // re-calculates, the feature already has its final status
-            if (event.status) {
-              console.log('[AutoMode] Updating feature status to:', event.status);
-              const { updateFeature, features } = useAppStore.getState();
-              const featureBefore = features.find((f) => f.id === event.featureId);
-              console.log('[AutoMode] Feature before update:', featureBefore?.status);
-
-              updateFeature(event.featureId, {
-                status: event.status as any,
-                updatedAt: new Date().toISOString(),
-              });
-
-              const featuresAfter = useAppStore.getState().features;
-              const featureAfter = featuresAfter.find((f) => f.id === event.featureId);
-              console.log('[AutoMode] Feature after update:', featureAfter?.status);
-              console.log('[AutoMode] Total features in store:', featuresAfter.length);
-            }
-
-            // NOW remove from running tasks (after status is updated)
-            // Log running tasks before removal
-            const runningBefore =
-              useAppStore.getState().autoModeByProject[eventProjectId]?.runningTasks || [];
-            console.log('[AutoMode] Running tasks before removal:', runningBefore);
-            console.log(
-              '[AutoMode] Is feature in running tasks?',
-              runningBefore.includes(event.featureId)
-            );
-
+            console.log('[AutoMode] Feature completed:', event.featureId, 'passes:', event.passes);
             removeRunningTask(eventProjectId, event.featureId);
-
-            // Log running tasks after removal
-            const runningAfter =
-              useAppStore.getState().autoModeByProject[eventProjectId]?.runningTasks || [];
-            console.log('[AutoMode] Running tasks after removal:', runningAfter);
-            console.log('[AutoMode] Was feature removed?', !runningAfter.includes(event.featureId));
-
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'complete',
@@ -310,28 +262,6 @@ export function useAutoMode() {
               message: `Revising plan based on feedback (v${revisionEvent.planVersion})...`,
               phase: 'planning',
             });
-          }
-          break;
-
-        case 'feature_status_changed':
-          // Feature status changed - update the feature in the store
-          if (event.featureId && event.status) {
-            console.log(
-              `[AutoMode] >>> feature_status_changed event: ${event.featureId} -> ${event.status}`
-            );
-            const { updateFeature, features } = useAppStore.getState();
-            const featureBefore = features.find((f) => f.id === event.featureId);
-            console.log('[AutoMode] Status before:', featureBefore?.status);
-
-            updateFeature(event.featureId, {
-              status: event.status as any,
-              updatedAt: event.updatedAt,
-            });
-
-            const featureAfter = useAppStore
-              .getState()
-              .features.find((f) => f.id === event.featureId);
-            console.log('[AutoMode] Status after:', featureAfter?.status);
           }
           break;
 

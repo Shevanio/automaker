@@ -389,9 +389,22 @@ export class HttpApiClient implements ElectronAPI {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          const callbacks = this.eventCallbacks.get(data.type);
-          if (callbacks) {
-            callbacks.forEach((cb) => cb(data.payload));
+
+          // Handle batched events from server
+          if (data.type === 'batch' && Array.isArray(data.events)) {
+            // Process each event in the batch
+            data.events.forEach((batchedEvent: any) => {
+              const callbacks = this.eventCallbacks.get(batchedEvent.type as any);
+              if (callbacks) {
+                callbacks.forEach((cb) => cb(batchedEvent.payload));
+              }
+            });
+          } else {
+            // Handle single event (legacy format)
+            const callbacks = this.eventCallbacks.get(data.type);
+            if (callbacks) {
+              callbacks.forEach((cb) => cb(data.payload));
+            }
           }
         } catch (error) {
           console.error('[HttpApiClient] Failed to parse WebSocket message:', error);
@@ -1440,7 +1453,7 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/backlog-plan/apply', { projectPath, plan }),
 
     onEvent: (callback: (data: unknown) => void): (() => void) => {
-      return this.subscribeToEvent('backlog-plan:event', callback as EventCallback);
+      return this.subscribeToEvent('backlog-plan:event' as any, callback as EventCallback);
     },
   };
 

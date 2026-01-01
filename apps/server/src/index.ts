@@ -180,6 +180,16 @@ const generalLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
+  // Skip rate limiting for essential read operations that the UI needs
+  skip: (req) => {
+    const exemptPaths = [
+      '/api/features/list',
+      '/api/features/get',
+      '/api/worktree/list',
+      '/api/health',
+    ];
+    return exemptPaths.some((path) => req.path === path);
+  },
 });
 
 // Stricter rate limit for agent/AI endpoints (expensive operations)

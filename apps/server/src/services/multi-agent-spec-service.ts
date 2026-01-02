@@ -77,7 +77,8 @@ export class MultiAgentSpecService {
   }
 
   /**
-   * Runs all agents in parallel for maximum speed
+   * Runs all agents in parallel with concurrency limit
+   * Limits concurrent SDK process spawns to avoid resource contention
    */
   private async runAgentsParallel(
     feature: Feature,
@@ -85,24 +86,41 @@ export class MultiAgentSpecService {
     projectContext: string,
     model?: string
   ): Promise<AgentAnalysis[]> {
-    logger.info(`Running ${agents.length} agents in parallel`);
-
-    const promises = agents.map((agent) =>
-      this.runSingleAgent(feature, agent, projectContext, model)
+    const MAX_CONCURRENT_AGENTS = 3; // Limit concurrent agents to avoid spawn issues
+    logger.info(
+      `Running ${agents.length} agents in parallel (max ${MAX_CONCURRENT_AGENTS} concurrent)`
     );
 
-    const results = await Promise.allSettled(promises);
+    const results: AgentAnalysis[] = [];
 
-    return results.map((result, idx) => {
-      if (result.status === 'fulfilled') {
-        return result.value;
-      } else {
-        const error =
-          result.reason instanceof Error ? result.reason : new Error(String(result.reason));
-        logger.error(`Agent ${agents[idx].name} failed:`, error);
-        return this.createFailedAnalysis(agents[idx], error);
-      }
-    });
+    // Process agents in batches
+    for (let i = 0; i < agents.length; i += MAX_CONCURRENT_AGENTS) {
+      const batch = agents.slice(i, i + MAX_CONCURRENT_AGENTS);
+      logger.info(
+        `Processing batch ${Math.floor(i / MAX_CONCURRENT_AGENTS) + 1}: ${batch.map((a) => a.name).join(', ')}`
+      );
+
+      const batchPromises = batch.map((agent) =>
+        this.runSingleAgent(feature, agent, projectContext, model)
+      );
+
+      const batchResults = await Promise.allSettled(batchPromises);
+
+      results.push(
+        ...batchResults.map((result, idx) => {
+          if (result.status === 'fulfilled') {
+            return result.value;
+          } else {
+            const error =
+              result.reason instanceof Error ? result.reason : new Error(String(result.reason));
+            logger.error(`Agent ${batch[idx].name} failed:`, error);
+            return this.createFailedAnalysis(batch[idx], error);
+          }
+        })
+      );
+    }
+
+    return results;
   }
 
   /**

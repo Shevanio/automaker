@@ -19,13 +19,15 @@ export function useSpecLoading() {
         setAppSpec(result.content);
         setSpecExists(true);
       } else {
-        // File doesn't exist
+        // File doesn't exist - treat as empty spec (still allow editing/analysis)
         setAppSpec('');
-        setSpecExists(false);
+        setSpecExists(true); // Changed from false - allow editing empty spec
       }
     } catch (error) {
       console.error('Failed to load spec:', error);
-      setSpecExists(false);
+      // Even on error, allow editing (treat as empty spec)
+      setAppSpec('');
+      setSpecExists(true); // Changed from false
     } finally {
       setIsLoading(false);
     }

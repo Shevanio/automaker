@@ -6,6 +6,12 @@
  * In web mode, this server runs on a remote host.
  */
 
+// Ensure node is in PATH for Claude Agent SDK subprocess spawning
+// This fixes "spawn node ENOENT" error when SDK tries to spawn child processes
+if (process.env.PATH && !process.env.PATH.includes('/home/linuxbrew/.linuxbrew/bin')) {
+  process.env.PATH = `/home/linuxbrew/.linuxbrew/bin:${process.env.PATH}`;
+}
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';

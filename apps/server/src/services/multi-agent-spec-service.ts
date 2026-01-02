@@ -192,7 +192,7 @@ export class MultiAgentSpecService {
         cwd: projectPath || process.cwd(), // CRITICAL: Use project PATH, not context string
         model: model || agent.model || 'sonnet', // Use alias 'sonnet' for cheaper, faster model
         systemPrompt: agent.systemPrompt,
-        maxTurns: 50, // Give enough turns to analyze but not too many
+        maxTurns: 25, // Reduced from 50: agents should analyze quickly and efficiently
         allowedTools: TOOL_PRESETS.readOnly, // Read-only tools for analysis
       });
 

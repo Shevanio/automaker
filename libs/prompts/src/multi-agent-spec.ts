@@ -30,12 +30,12 @@ ${featureDescription}
 
 As a ${agentFocus} expert, identify ALL tasks needed in your domain to implement this feature successfully.
 
-**CRITICAL FIRST STEP**: Before analyzing, you MUST:
-1. Use the **Glob** tool to find relevant files (e.g., \`Glob pattern="**/*.tsx"\` for React components)
-2. Use the **Read** tool to examine existing code structure
-3. Use the **Grep** tool to search for related patterns or implementations
+**CRITICAL WORKFLOW**:
+1. **Explore** (5-10 tool calls max): Use Glob/Read/Grep to understand relevant code structure
+2. **Analyze** (mentally): Based on what you found, identify the key tasks needed
+3. **Respond** (immediately): Output the JSON with your findings
 
-Only AFTER using these tools to understand the codebase should you provide your analysis.
+⚠️ **BE EFFICIENT**: You have limited turns. Don't over-analyze - find the key files, understand the patterns, and respond with your JSON. Quality over quantity.
 
 ### For Each Task, Provide:
 
@@ -51,9 +51,9 @@ Only AFTER using these tools to understand the codebase should you provide your 
 
 ### Also Provide:
 
-- **insights**: Array of important considerations, best practices, or recommendations
-- **warnings**: Array of potential risks, pitfalls, or challenges to watch out for
-- **dependencies**: Array of external libraries or services that might be needed
+- **insights**: Array of 2-4 CRITICAL insights only (not obvious facts, but important non-obvious considerations)
+- **warnings**: Array of 2-4 HIGH-PRIORITY warnings only (critical risks that could cause serious problems)
+- **dependencies**: Array of external libraries or services that might be needed (if any)
 
 ### Guidelines:
 
@@ -101,9 +101,11 @@ You MUST respond with ONLY a JSON code block in this exact format (nothing befor
 CRITICAL RULES:
 1. Your response must START with \`\`\`json and END with \`\`\`
 2. Do NOT add any text before or after the JSON code block
-3. Use the Read, Glob, and Grep tools to analyze the project before responding
+3. Use the Read, Glob, and Grep tools to analyze the project EFFICIENTLY (5-10 tool calls max)
 4. The JSON must be valid and parseable
-5. Include at least 2-5 tasks in the tasks array (empty arrays are NOT acceptable)`;
+5. Include 2-5 tasks in the tasks array (focus on the MOST IMPORTANT tasks)
+6. Include 2-4 insights (only non-obvious, critical insights - not basic facts)
+7. Include 2-4 warnings (only high-priority risks - not minor issues)`;
 }
 
 /**

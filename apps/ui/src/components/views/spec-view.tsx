@@ -1,6 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
+import type { MultiAgentAnalysis } from '@automaker/types';
 
 // Extracted hooks
 import {
@@ -19,6 +20,9 @@ import {
   RegenerateSpecDialog,
   MultiAgentAnalysisModal,
 } from './spec-view/dialogs';
+
+// Utilities
+import { formatAnalysisToSpec } from './spec-view/utils';
 
 export function SpecView() {
   const { currentProject, appSpec } = useAppStore();
@@ -99,10 +103,21 @@ export function SpecView() {
     setShowMultiAgentModal(true);
   };
 
-  const handleApplyAnalysis = (analysisResult: any) => {
-    // TODO: Apply the multi-agent analysis to the spec
-    // This would involve formatting the combined_steps into a spec format
-    console.log('Applying analysis:', analysisResult);
+  const handleApplyAnalysis = async (analysisResult: MultiAgentAnalysis) => {
+    try {
+      // Format the analysis into a comprehensive spec
+      const formattedSpec = formatAnalysisToSpec(analysisResult);
+
+      // Update the spec in the editor
+      handleChange(formattedSpec);
+
+      // Trigger save (will show unsaved changes indicator)
+      setHasChanges(true);
+
+      console.log('✅ Applied multi-agent analysis to spec');
+    } catch (error) {
+      console.error('❌ Failed to apply analysis:', error);
+    }
   };
 
   // Reset hasChanges when spec is reloaded

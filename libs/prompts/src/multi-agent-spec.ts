@@ -13,56 +13,56 @@ export function buildMultiAgentAnalysisPrompt(params: {
 }): string {
   const { agentFocus, featureTitle, featureDescription, projectContext } = params;
 
-  return `# Feature Analysis Request
+  return `# Application Documentation Request
 
-You are analyzing a software feature from the perspective of: **${agentFocus}**
+You are documenting an existing software application from the perspective of: **${agentFocus}**
 
 ${projectContext ? `## Project Context\n${projectContext}\n` : ''}
 
-## Feature to Analyze
+## Application to Document
 
 **Title**: ${featureTitle}
 
-**Description**:
+**Scope**:
 ${featureDescription}
 
 ## Your Task
 
-As a ${agentFocus} expert, identify ALL tasks needed in your domain to implement this feature successfully.
+As a ${agentFocus} expert, DOCUMENT and ANALYZE the current state of this application from your domain perspective.
 
 **CRITICAL WORKFLOW**:
-1. **Explore** (5-10 tool calls max): Use Glob/Read/Grep to understand relevant code structure
-2. **Analyze** (mentally): Based on what you found, identify the key tasks needed
-3. **Respond** (immediately): Output the JSON with your findings
+1. **Explore** (5-10 tool calls max): Use Glob/Read/Grep to understand current architecture and implementation
+2. **Analyze** (mentally): Based on what you found, understand the current system design and patterns
+3. **Respond** (immediately): Output the JSON documenting what EXISTS (not what should be built)
 
-⚠️ **BE EFFICIENT**: You have limited turns. Don't over-analyze - find the key files, understand the patterns, and respond with your JSON. Quality over quantity.
+⚠️ **BE EFFICIENT**: You have limited turns. Focus on understanding WHAT IS ALREADY IMPLEMENTED, not what needs to be built.
 
-### For Each Task, Provide:
+### For Each Section, Provide:
 
-1. **title**: Clear, action-oriented title (e.g., "Create user profile component")
-2. **description**: Detailed instructions on how to implement this task
-3. **estimated_duration_mins**: Realistic time estimate (15-120 minutes per task)
-4. **priority**: 'low', 'medium', or 'high'
-5. **files_to_create**: Array of new file paths (if applicable)
-6. **files_to_modify**: Array of existing files to modify (if applicable)
-7. **tests_required**: Array of test files needed (if applicable)
-8. **complexity**: Score from 1-10 (1=trivial, 10=very complex)
-9. **agent_notes**: Any additional context or considerations
+1. **title**: Descriptive title of an existing component/feature/pattern (e.g., "User Authentication System")
+2. **description**: Documentation of HOW IT CURRENTLY WORKS, including file locations, architecture patterns, and key implementation details
+3. **estimated_duration_mins**: Set to 0 (this is documentation, not implementation tasks)
+4. **priority**: Always 'medium' (this is documentation, not prioritized tasks)
+5. **files_to_create**: LEAVE EMPTY (we're documenting existing code)
+6. **files_to_modify**: Array of existing files that implement this feature (for reference)
+7. **tests_required**: Array of existing test files (for reference)
+8. **complexity**: Score from 1-10 indicating current system complexity (1=simple, 10=very complex)
+9. **agent_notes**: Important architectural decisions, patterns used, or notable implementation details
 
 ### Also Provide:
 
-- **insights**: Array of 2-4 CRITICAL insights only (not obvious facts, but important non-obvious considerations)
-- **warnings**: Array of 2-4 HIGH-PRIORITY warnings only (critical risks that could cause serious problems)
-- **dependencies**: Array of external libraries or services that might be needed (if any)
+- **insights**: Array of 2-4 KEY ARCHITECTURAL INSIGHTS about how the current system works (not suggestions for improvement, but important design decisions that were made)
+- **warnings**: Array of 2-4 NOTABLE LIMITATIONS or technical debt in the current implementation (document existing issues, don't propose solutions)
+- **dependencies**: Array of external libraries or services that ARE CURRENTLY USED in this domain
 
 ### Guidelines:
 
-- Break down complex work into atomic, focused tasks
-- Each task should be completable independently when possible
-- Be specific about file names, paths, and technical details
-- Consider edge cases and error scenarios
-- Think about maintainability and future extensibility
-- Don't forget about error handling, validation, and logging
+- Document what EXISTS, not what should be built
+- Focus on CURRENT architecture, patterns, and implementation
+- Be specific about actual file names, paths, and technical details found in the code
+- Describe HOW things currently work, not how they should work
+- Document existing error handling, validation, and logging approaches
+- If something doesn't exist yet, simply don't include it (don't create tasks for it)
 
 ## Output Format
 
@@ -72,28 +72,29 @@ You MUST respond with ONLY a JSON code block in this exact format (nothing befor
 {
   "tasks": [
     {
-      "title": "Specific task title",
-      "description": "Detailed implementation instructions with code examples if helpful",
-      "estimated_duration_mins": 30,
-      "priority": "high",
-      "files_to_create": ["src/components/NewComponent.tsx"],
-      "files_to_modify": ["src/App.tsx", "src/routes/index.ts"],
-      "tests_required": ["src/components/__tests__/NewComponent.test.tsx"],
-      "complexity": 5,
-      "agent_notes": "Remember to handle loading and error states"
+      "title": "Authentication System",
+      "description": "The application uses a dual authentication system: API keys for Electron mode (stored in DATA_DIR/.api-key with 0o600 permissions) and session cookies for web mode (HTTP-only cookies). Session tokens are persisted to disk in DATA_DIR/.sessions. The auth middleware (apps/server/src/middleware/auth.ts) validates requests using timing-safe comparison. WebSocket connections use short-lived connection tokens (5-minute expiry) generated via createWsConnectionToken().",
+      "estimated_duration_mins": 0,
+      "priority": "medium",
+      "files_to_create": [],
+      "files_to_modify": ["apps/server/src/middleware/auth.ts", "apps/server/src/lib/auth-utils.ts"],
+      "tests_required": ["apps/server/tests/unit/middleware/auth.test.ts"],
+      "complexity": 7,
+      "agent_notes": "The dual-mode architecture (Electron vs Web) creates complexity - Electron uses IPC header-based auth while web mode uses traditional HTTP cookies"
     }
   ],
   "insights": [
-    "Consider using existing authentication context rather than creating new one",
-    "This feature will increase bundle size by ~50KB, consider code splitting"
+    "The authentication system separates API key generation (crypto.randomBytes) from session management, allowing different lifetime policies for different auth methods",
+    "Session persistence to disk (instead of memory-only) enables session recovery across server restarts, but creates security considerations for multi-user deployments"
   ],
   "warnings": [
-    "API endpoint changes will require database migration - coordinate with backend team",
-    "Breaking change for existing users - need migration strategy"
+    "API keys are currently printed to console on startup (suppressible via AUTOMAKER_HIDE_API_KEY env var) which could leak credentials in production logs",
+    "When ALLOWED_ROOT_DIRECTORY is not configured, the system allows unrestricted filesystem access - this is a critical security issue for production deployments"
   ],
   "dependencies": [
-    "react-hook-form@^7.0.0",
-    "zod@^3.0.0"
+    "express@^5.0.0",
+    "cookie-parser@^1.4.6",
+    "ws@^8.18.0"
   ]
 }
 \`\`\`
@@ -101,11 +102,13 @@ You MUST respond with ONLY a JSON code block in this exact format (nothing befor
 CRITICAL RULES:
 1. Your response must START with \`\`\`json and END with \`\`\`
 2. Do NOT add any text before or after the JSON code block
-3. Use the Read, Glob, and Grep tools to analyze the project EFFICIENTLY (5-10 tool calls max)
+3. Use the Read, Glob, and Grep tools to analyze the EXISTING code EFFICIENTLY (5-10 tool calls max)
 4. The JSON must be valid and parseable
-5. Include 2-5 tasks in the tasks array (focus on the MOST IMPORTANT tasks)
-6. Include 2-4 insights (only non-obvious, critical insights - not basic facts)
-7. Include 2-4 warnings (only high-priority risks - not minor issues)`;
+5. Include 2-5 sections in the tasks array documenting EXISTING major components/systems (NOT implementation tasks)
+6. Each "task" title should describe what EXISTS (e.g., "API Rate Limiting System") not what should be built (e.g., "Implement rate limiting")
+7. Set estimated_duration_mins to 0 for all entries (this is documentation, not work to be done)
+8. Include 2-4 insights about KEY ARCHITECTURAL DECISIONS in the current system
+9. Include 2-4 warnings about EXISTING LIMITATIONS or technical debt (document problems, don't propose solutions)`;
 }
 
 /**

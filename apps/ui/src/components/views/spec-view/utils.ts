@@ -18,11 +18,8 @@ export function formatAnalysisToSpec(analysis: MultiAgentAnalysis): string {
   }
 
   // Summary metadata
-  sections.push(`## Implementation Summary\n`);
-  sections.push(`- **Total Tasks**: ${analysis.metadata.total_tasks}`);
-  sections.push(
-    `- **Estimated Duration**: ${analysis.metadata.total_duration_mins} minutes (~${Math.round(analysis.metadata.total_duration_mins / 60)} hours)`
-  );
+  sections.push(`## Documentation Summary\n`);
+  sections.push(`- **Total Components**: ${analysis.metadata.total_tasks}`);
   sections.push(`- **Complexity Score**: ${analysis.metadata.complexity_score}/10`);
   sections.push(`- **Risk Level**: ${analysis.metadata.risk_level.toUpperCase()}`);
   sections.push(
@@ -30,43 +27,33 @@ export function formatAnalysisToSpec(analysis: MultiAgentAnalysis): string {
   );
   sections.push(``);
 
-  // Combined implementation steps
+  // Architecture Components & Systems
   if (analysis.combined_steps && analysis.combined_steps.length > 0) {
-    sections.push(`## Implementation Steps\n`);
+    sections.push(`## Architecture Components\n`);
     sections.push(
-      `The following ${analysis.combined_steps.length} tasks are organized in the recommended execution order:\n`
+      `The following ${analysis.combined_steps.length} components and systems document the current application architecture:\n`
     );
 
     analysis.combined_steps.forEach((step) => {
       const agentIcon = getAgentIcon(step.agent_source);
       sections.push(`### ${step.order}. ${step.title} ${agentIcon}`);
       sections.push(``);
-      sections.push(`**Description**: ${step.description}\n`);
-
-      if (step.estimated_duration_mins) {
-        sections.push(`**Estimated Duration**: ${step.estimated_duration_mins} minutes\n`);
-      }
-
-      if (step.files_to_create && step.files_to_create.length > 0) {
-        sections.push(`**Files to Create**:`);
-        step.files_to_create.forEach((file) => sections.push(`- \`${file}\``));
-        sections.push(``);
-      }
+      sections.push(`**Documentation**: ${step.description}\n`);
 
       if (step.files_to_modify && step.files_to_modify.length > 0) {
-        sections.push(`**Files to Modify**:`);
+        sections.push(`**Implementation Files**:`);
         step.files_to_modify.forEach((file) => sections.push(`- \`${file}\``));
         sections.push(``);
       }
 
       if (step.tests_required && step.tests_required.length > 0) {
-        sections.push(`**Tests Required**:`);
+        sections.push(`**Test Files**:`);
         step.tests_required.forEach((test) => sections.push(`- \`${test}\``));
         sections.push(``);
       }
 
       if (step.agent_notes) {
-        sections.push(`**Notes**:\n${step.agent_notes}\n`);
+        sections.push(`**Technical Notes**:\n${step.agent_notes}\n`);
       }
 
       sections.push(`---\n`);
@@ -83,19 +70,19 @@ export function formatAnalysisToSpec(analysis: MultiAgentAnalysis): string {
       sections.push(``);
 
       if (agent.insights && agent.insights.length > 0) {
-        sections.push(`**Key Insights**:`);
+        sections.push(`**Architectural Insights**:`);
         agent.insights.forEach((insight) => sections.push(`- 💡 ${insight}`));
         sections.push(``);
       }
 
       if (agent.warnings && agent.warnings.length > 0) {
-        sections.push(`**Warnings**:`);
+        sections.push(`**Known Limitations**:`);
         agent.warnings.forEach((warning) => sections.push(`- ⚠️ ${warning}`));
         sections.push(``);
       }
 
       if (agent.dependencies && agent.dependencies.length > 0) {
-        sections.push(`**Dependencies**:`);
+        sections.push(`**Current Dependencies**:`);
         agent.dependencies.forEach((dep) => sections.push(`- ${dep}`));
         sections.push(``);
       }

@@ -153,6 +153,53 @@ When agent returns empty/short responses:
    - Verify allowedTools includes Read, Glob, Grep
    - Verify maxTurns is reasonable (50 should be enough)
 
+## ✅ RESOLVED ISSUES (Commit 81e6e20)
+
+### Problem 1: "Apply Spec" Button Does Nothing ✅ FIXED
+
+**Symptom**: Clicking "Apply Spec" after analysis completed did nothing, no console logs, no errors.
+
+**Root Cause**: `handleApplyAnalysis` was a TODO stub with only `console.log`
+
+**Solution**:
+
+- Created `formatAnalysisToSpec()` utility to convert `MultiAgentAnalysis` to markdown spec
+- Implemented full `handleApplyAnalysis` to format and insert spec into editor
+- Triggers save/unsaved changes indicator
+- **File**: `apps/ui/src/components/views/spec-view/utils.ts` (NEW)
+
+### Problem 2: Analysis Takes Too Long (2-3 minutes) ✅ OPTIMIZED
+
+**Symptom**: Each batch of 3 agents takes ~2.5 minutes (total ~5 minutes for 6 agents)
+
+**Root Cause**:
+
+- `maxTurns: 50` allowed agents to explore extensively
+- No guidance on efficiency in prompt
+- Agents were doing 40-60 tool calls each
+
+**Solution**:
+
+- Reduced `maxTurns` from 50 to 25 (halves exploration time)
+- Updated prompt to emphasize "5-10 tool calls max"
+- Changed workflow instructions to "Explore quickly, analyze mentally, respond immediately"
+- **Expected improvement**: 3 min → ~1.5 min total
+
+### Problem 3: Too Many Warnings (10-15 per agent) ✅ OPTIMIZED
+
+**Symptom**: Analysis shows 60+ warnings total, most are minor/obvious issues
+
+**Root Cause**: Prompt didn't specify quality/quantity guidelines for insights and warnings
+
+**Solution**:
+
+- Limited insights to "2-4 CRITICAL insights only (not obvious facts)"
+- Limited warnings to "2-4 HIGH-PRIORITY warnings only (critical risks)"
+- Updated prompt rules to emphasize quality over quantity
+- **Expected improvement**: 60+ warnings → 12-24 warnings (only critical ones)
+
+---
+
 ## Next Steps
 
 ### If Agents Still Return Empty Responses

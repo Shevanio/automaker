@@ -150,3 +150,18 @@ export type {
   PipelineStepExecution,
   PipelineExecution,
 } from './pipeline.js';
+
+// Multi-Agent Spec types
+export type {
+  AgentSpecialization,
+  SpecializationAgent,
+  AgentAnalysisStatus,
+  AgentTask,
+  AgentAnalysis,
+  CombinedSpecStep,
+  CombinedSpecMetadata,
+  MultiAgentAnalysis,
+  MultiAgentAnalysisRequest,
+  MultiAgentProgressEvent,
+} from './multi-agent-spec.js';
+export { DEFAULT_AGENTS } from './multi-agent-spec.js';

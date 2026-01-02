@@ -60,3 +60,6 @@ export type {
   ResolvedBacklogPlanPrompts,
   ResolvedEnhancementPrompts,
 } from '@automaker/types';
+
+// Multi-Agent Spec prompts
+export { buildMultiAgentAnalysisPrompt, buildSpecCombinationPrompt } from './multi-agent-spec.js';

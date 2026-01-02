@@ -21,11 +21,17 @@ interface DirectoryEntry {
   path: string;
 }
 
+interface FileEntry {
+  name: string;
+  path: string;
+}
+
 interface BrowseResult {
   success: boolean;
   currentPath: string;
   parentPath: string | null;
   directories: DirectoryEntry[];
+  files?: FileEntry[];
   drives?: string[];
   error?: string;
   warning?: string;
@@ -38,6 +44,14 @@ interface FileBrowserDialogProps {
   title?: string;
   description?: string;
   initialPath?: string;
+  /** Show files in addition to directories */
+  showFiles?: boolean;
+  /** File extensions to show (e.g., ['.md', '.txt']). If not provided, shows all files */
+  fileExtensions?: string[];
+  /** Allow selecting multiple items */
+  allowMultiple?: boolean;
+  /** Callback for multiple selection (used when allowMultiple is true) */
+  onSelectMultiple?: (paths: string[]) => void;
 }
 
 const RECENT_FOLDERS_KEY = 'file-browser-recent-folders';

@@ -35,6 +35,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { FilePickerDialog } from '@/components/dialogs/file-picker-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -91,8 +92,8 @@ export function ContextView() {
   const [editDescriptionValue, setEditDescriptionValue] = useState('');
   const [editDescriptionFileName, setEditDescriptionFileName] = useState('');
 
-  // File input ref for import
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // File picker modal state (server-side file browser)
+  const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
 
   // Get images directory path
   const getImagesPath = useCallback(() => {
@@ -438,22 +439,59 @@ export function ContextView() {
     setIsDropHovering(false);
   };
 
-  // Handle file import via button
+  // Handle file import via button (opens server-side file picker)
   const handleImportClick = () => {
-    fileInputRef.current?.click();
+    setIsFilePickerOpen(true);
   };
 
-  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Handle file selection from server
+  const handleFilePickerSelect = async (filePaths: string[]) => {
+    if (!currentProject) return;
 
-    for (const file of Array.from(files)) {
-      await uploadFile(file);
-    }
+    setIsUploading(true);
 
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    try {
+      const api = getElectronAPI();
+      const contextPath = getContextPath();
+      if (!contextPath) return;
+
+      // Copy each selected file to the context directory
+      for (const sourceFilePath of filePaths) {
+        try {
+          // Read file from server
+          const result = await api.readFile(sourceFilePath);
+          if (!result.success || result.content === undefined) {
+            console.error(`Failed to read ${sourceFilePath}:`, result.error);
+            continue;
+          }
+
+          // Extract filename
+          const fileName = sourceFilePath.split(/[/\\]/).pop() || 'unnamed';
+          setUploadingFileName(fileName);
+
+          // Write to context directory
+          const destPath = `${contextPath}/${fileName}`;
+          await api.writeFile(destPath, result.content);
+
+          // Reload files immediately
+          await loadContextFiles();
+
+          // Generate description in background
+          const isImage = isImageFile(fileName);
+          generateDescriptionAsync(destPath, fileName, isImage);
+        } catch (error) {
+          console.error(`Failed to copy file ${sourceFilePath}:`, error);
+          toast.error(`Failed to import ${sourceFilePath.split(/[/\\]/).pop()}`);
+        }
+      }
+
+      toast.success(`Imported ${filePaths.length} file(s) successfully`);
+    } catch (error) {
+      console.error('Failed to import files:', error);
+      toast.error('Failed to import files');
+    } finally {
+      setIsUploading(false);
+      setUploadingFileName(null);
     }
   };
 
@@ -659,14 +697,15 @@ export function ContextView() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden content-bg" data-testid="context-view">
-      {/* Hidden file input for import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={handleFileInputChange}
-        data-testid="file-import-input"
+      {/* Server-side file picker dialog */}
+      <FilePickerDialog
+        open={isFilePickerOpen}
+        onOpenChange={setIsFilePickerOpen}
+        onSelect={handleFilePickerSelect}
+        title="Import Context Files from Server"
+        description="Select files from the server file system to import"
+        initialPath={currentProject?.path}
+        allowMultiple={true}
       />
 
       {/* Header */}

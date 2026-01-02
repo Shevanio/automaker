@@ -12,7 +12,10 @@ import { getErrorMessage, logError } from '../common.js';
 export function createBrowseHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { dirPath } = req.body as { dirPath?: string };
+      const { dirPath, includeFiles = false } = req.body as {
+        dirPath?: string;
+        includeFiles?: boolean;
+      };
 
       // Default to ALLOWED_ROOT_DIRECTORY if set, otherwise home directory
       const defaultPath = getAllowedRootDirectory() || os.homedir();
@@ -67,11 +70,23 @@ export function createBrowseHandler() {
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
 
+        // Filter for files if requested
+        const files = includeFiles
+          ? entries
+              .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+              .map((entry) => ({
+                name: entry.name,
+                path: path.join(targetPath, entry.name),
+              }))
+              .sort((a, b) => a.name.localeCompare(b.name))
+          : [];
+
         res.json({
           success: true,
           currentPath: targetPath,
           parentPath: hasParent ? parentPath : null,
           directories,
+          files,
           drives,
         });
       } catch (error) {
@@ -86,6 +101,7 @@ export function createBrowseHandler() {
             currentPath: targetPath,
             parentPath: hasParent ? parentPath : null,
             directories: [],
+            files: [],
             drives,
             warning:
               'Permission denied - grant Full Disk Access to Terminal in System Preferences > Privacy & Security',

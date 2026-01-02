@@ -6,6 +6,7 @@
  */
 
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
+import { spawn } from 'child_process';
 import { BaseProvider } from './base-provider.js';
 import { classifyError, getUserFriendlyErrorMessage } from '@automaker/utils';
 import type {
@@ -58,8 +59,19 @@ export class ClaudeProvider extends BaseProvider {
       maxTurns,
       cwd,
       // CRITICAL: Pass environment variables to subprocess
-      // This fixes "spawn node ENOENT" by ensuring node is in PATH
       env: process.env as Record<string, string | undefined>,
+      // CRITICAL: Override spawn to use process.execPath instead of "node"
+      // This fixes "spawn node ENOENT" by using the full path to the node binary
+      spawnClaudeCodeProcess: (spawnOptions) => {
+        // Use process.execPath (full path to node) instead of "node" string
+        // This ensures subprocess can find the node executable
+        return spawn(process.execPath, spawnOptions.args, {
+          cwd: spawnOptions.cwd,
+          env: spawnOptions.env,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          signal: spawnOptions.signal,
+        });
+      },
       // Only restrict tools if explicitly set OR (no MCP / unrestricted disabled)
       ...(allowedTools && shouldRestrictTools && { allowedTools }),
       ...(!allowedTools && shouldRestrictTools && { allowedTools: defaultTools }),
@@ -105,12 +117,12 @@ export class ClaudeProvider extends BaseProvider {
     // Execute via Claude Agent SDK
     try {
       // DEBUG: Log PATH to diagnose spawn ENOENT
-      console.log(
-        '[ClaudeProvider] PATH in sdkOptions.env:',
-        sdkOptions.env?.PATH?.substring(0, 200)
-      );
+      console.log('[ClaudeProvider] FULL PATH in sdkOptions.env:', sdkOptions.env?.PATH);
       console.log('[ClaudeProvider] process.execPath:', process.execPath);
-      console.log('[ClaudeProvider] sdkOptions keys:', Object.keys(sdkOptions));
+      console.log(
+        '[ClaudeProvider] PATH includes linuxbrew?',
+        sdkOptions.env?.PATH?.includes('linuxbrew')
+      );
 
       const stream = query({ prompt: promptPayload, options: sdkOptions });
 

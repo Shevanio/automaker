@@ -165,6 +165,53 @@ export function createMultiAgentSpecRoutes(events: EventEmitter) {
     });
   });
 
+  /**
+   * POST /api/spec/save-improvements
+   *
+   * Saves improvement proposals to .automaker/improvements.md
+   *
+   * Request body:
+   * {
+   *   projectPath: string,
+   *   content: string
+   * }
+   */
+  router.post('/save-improvements', async (req: Request, res: Response) => {
+    const { projectPath, content } = req.body;
+
+    if (!projectPath || !content) {
+      return res.status(400).json({
+        success: false,
+        error: 'projectPath and content are required',
+      });
+    }
+
+    try {
+      const { ensureAutomakerDir } = await import('@automaker/platform');
+      const fs = await import('fs/promises');
+      const path = await import('path');
+
+      // Ensure .automaker directory exists
+      const automakerDir = await ensureAutomakerDir(projectPath);
+
+      // Write improvements.md
+      const improvementsPath = path.join(automakerDir, 'improvements.md');
+      await fs.writeFile(improvementsPath, content, 'utf-8');
+
+      logger.info(`Saved improvements to ${improvementsPath}`);
+
+      res.json({
+        success: true,
+        path: improvementsPath,
+      });
+    } catch (error: any) {
+      logger.error('Failed to save improvements:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to save improvements',
+      });
+    }
+  });
   return router;
 }
 

@@ -37,17 +37,19 @@ As a ${agentFocus} expert, DOCUMENT and ANALYZE the current state of this applic
 
 ⚠️ **BE EFFICIENT**: You have limited turns. Focus on understanding WHAT IS ALREADY IMPLEMENTED, not what needs to be built.
 
-### For Each Section, Provide:
+### Your Documentation Should Include:
 
-1. **title**: Descriptive title of an existing component/feature/pattern (e.g., "User Authentication System")
-2. **description**: Documentation of HOW IT CURRENTLY WORKS, including file locations, architecture patterns, and key implementation details
-3. **estimated_duration_mins**: Set to 0 (this is documentation, not implementation tasks)
-4. **priority**: Always 'medium' (this is documentation, not prioritized tasks)
-5. **files_to_create**: LEAVE EMPTY (we're documenting existing code)
-6. **files_to_modify**: Array of existing files that implement this feature (for reference)
-7. **tests_required**: Array of existing test files (for reference)
-8. **complexity**: Score from 1-10 indicating current system complexity (1=simple, 10=very complex)
-9. **agent_notes**: Important architectural decisions, patterns used, or notable implementation details
+**ONLY 1-2 HIGH-LEVEL ARCHITECTURE SUMMARIES** (NOT a list of every component!)
+
+For each summary section:
+1. **title**: High-level area name (e.g., "Authentication & Authorization System", "Frontend State Management Architecture")
+2. **description**: COMPREHENSIVE summary (2-4 sentences) covering:
+   - Overall architecture pattern and design decisions
+   - Key technologies and frameworks used
+   - Major components and how they interact
+   - Notable implementation details and file locations
+3. **key_files**: Array of 3-8 MOST IMPORTANT files that implement this architecture
+4. **technologies**: Array of key libraries/frameworks used in this area
 
 ### Also Provide:
 
@@ -70,17 +72,16 @@ You MUST respond with ONLY a JSON code block in this exact format (nothing befor
 
 \`\`\`json
 {
-  "tasks": [
+  "architecture_summary": [
     {
-      "title": "Authentication System",
-      "description": "The application uses a dual authentication system: API keys for Electron mode (stored in DATA_DIR/.api-key with 0o600 permissions) and session cookies for web mode (HTTP-only cookies). Session tokens are persisted to disk in DATA_DIR/.sessions. The auth middleware (apps/server/src/middleware/auth.ts) validates requests using timing-safe comparison. WebSocket connections use short-lived connection tokens (5-minute expiry) generated via createWsConnectionToken().",
-      "estimated_duration_mins": 0,
-      "priority": "medium",
-      "files_to_create": [],
-      "files_to_modify": ["apps/server/src/middleware/auth.ts", "apps/server/src/lib/auth-utils.ts"],
-      "tests_required": ["apps/server/tests/unit/middleware/auth.test.ts"],
-      "complexity": 7,
-      "agent_notes": "The dual-mode architecture (Electron vs Web) creates complexity - Electron uses IPC header-based auth while web mode uses traditional HTTP cookies"
+      "title": "Authentication & Authorization System",
+      "description": "The application implements a dual authentication architecture supporting both Electron (API keys) and Web (session cookies) modes. API keys are generated using crypto.randomBytes(32) and stored in DATA_DIR/.api-key with 0o600 permissions. Session tokens persist to disk in DATA_DIR/.sessions for recovery across restarts. The auth middleware (apps/server/src/middleware/auth.ts) validates requests using timing-safe comparison. WebSocket connections use ephemeral connection tokens with 5-minute expiry generated via createWsConnectionToken(). The dual-mode architecture creates complexity: Electron uses IPC header-based auth while web mode uses traditional HTTP cookies.",
+      "key_files": [
+        "apps/server/src/middleware/auth.ts",
+        "apps/server/src/lib/auth-utils.ts",
+        "apps/server/tests/unit/middleware/auth.test.ts"
+      ],
+      "technologies": ["express@^5.0.0", "cookie-parser@^1.4.6", "crypto.timingSafeEqual"]
     }
   ],
   "insights": [
@@ -104,9 +105,9 @@ CRITICAL RULES:
 2. Do NOT add any text before or after the JSON code block
 3. Use the Read, Glob, and Grep tools to analyze the EXISTING code EFFICIENTLY (5-10 tool calls max)
 4. The JSON must be valid and parseable
-5. Include 2-5 sections in the tasks array documenting EXISTING major components/systems (NOT implementation tasks)
-6. Each "task" title should describe what EXISTS (e.g., "API Rate Limiting System") not what should be built (e.g., "Implement rate limiting")
-7. Set estimated_duration_mins to 0 for all entries (this is documentation, not work to be done)
+5. Include ONLY 1-2 sections in the architecture_summary array (high-level summaries, NOT granular components)
+6. Each summary should be 2-4 sentences describing WHAT EXISTS and HOW IT WORKS
+7. Focus on ARCHITECTURAL PATTERNS and DESIGN DECISIONS, not implementation details
 8. Include 2-4 insights about KEY ARCHITECTURAL DECISIONS in the current system
 9. Include 2-4 warnings about EXISTING LIMITATIONS or technical debt (document problems, don't propose solutions)`;
 }

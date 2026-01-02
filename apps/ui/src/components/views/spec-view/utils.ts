@@ -19,11 +19,9 @@ export function formatAnalysisToSpec(analysis: MultiAgentAnalysis): string {
 
   // Summary metadata
   sections.push(`## Documentation Summary\n`);
-  sections.push(`- **Total Components**: ${analysis.metadata.total_tasks}`);
-  sections.push(`- **Complexity Score**: ${analysis.metadata.complexity_score}/10`);
-  sections.push(`- **Risk Level**: ${analysis.metadata.risk_level.toUpperCase()}`);
+  sections.push(`- **Components Documented**: ${analysis.metadata.total_tasks}`);
   sections.push(
-    `- **Successful Agents**: ${analysis.metadata.successful_agents}/${analysis.metadata.agents_used}`
+    `- **Analysis Coverage**: ${analysis.metadata.successful_agents}/${analysis.metadata.agents_used} agents`
   );
   sections.push(``);
 
@@ -75,12 +73,6 @@ export function formatAnalysisToSpec(analysis: MultiAgentAnalysis): string {
         sections.push(``);
       }
 
-      if (agent.warnings && agent.warnings.length > 0) {
-        sections.push(`**Known Limitations**:`);
-        agent.warnings.forEach((warning) => sections.push(`- ⚠️ ${warning}`));
-        sections.push(``);
-      }
-
       if (agent.dependencies && agent.dependencies.length > 0) {
         sections.push(`**Current Dependencies**:`);
         agent.dependencies.forEach((dep) => sections.push(`- ${dep}`));
@@ -96,6 +88,68 @@ export function formatAnalysisToSpec(analysis: MultiAgentAnalysis): string {
   sections.push(`- **Started**: ${new Date(analysis.started_at).toLocaleString()}`);
   sections.push(`- **Completed**: ${new Date(analysis.completed_at).toLocaleString()}`);
   sections.push(`- **Total Duration**: ${Math.round(analysis.total_duration_ms / 1000)} seconds`);
+  sections.push(``);
+
+  return sections.join('\n');
+}
+
+/**
+ * Formats warnings from multi-agent analysis into improvement proposals
+ */
+export function formatAnalysisToImprovements(analysis: MultiAgentAnalysis): string {
+  const sections: string[] = [];
+
+  // Title
+  sections.push(`# Proposed Improvements\n`);
+  sections.push(
+    `Based on the architectural analysis of **${analysis.feature_title || 'the application'}**\n`
+  );
+
+  // Collect all warnings by agent
+  const agentsWithWarnings = analysis.agents.filter(
+    (agent) => agent.status === 'completed' && agent.warnings && agent.warnings.length > 0
+  );
+
+  if (agentsWithWarnings.length === 0) {
+    sections.push(`## No Improvements Identified\n`);
+    sections.push(
+      `The analysis did not identify any significant architectural limitations or improvement opportunities.\n`
+    );
+    return sections.join('\n');
+  }
+
+  // Summary
+  sections.push(`## Summary\n`);
+  const totalWarnings = agentsWithWarnings.reduce(
+    (sum, agent) => sum + (agent.warnings?.length || 0),
+    0
+  );
+  sections.push(
+    `The multi-agent analysis identified **${totalWarnings} potential improvements** across ${agentsWithWarnings.length} domain areas.\n`
+  );
+
+  // Warnings by agent
+  sections.push(`## Improvement Opportunities by Domain\n`);
+
+  agentsWithWarnings.forEach((agent) => {
+    sections.push(`### ${agent.agent_icon} ${agent.agent_name}\n`);
+
+    if (agent.warnings && agent.warnings.length > 0) {
+      agent.warnings.forEach((warning, idx) => {
+        sections.push(`${idx + 1}. ${warning}\n`);
+      });
+    }
+
+    sections.push(``);
+  });
+
+  // Metadata
+  sections.push(`---\n`);
+  sections.push(`## Analysis Metadata\n`);
+  sections.push(`- **Generated**: ${new Date(analysis.completed_at).toLocaleString()}`);
+  sections.push(
+    `- **Agents Analyzed**: ${analysis.metadata.successful_agents}/${analysis.metadata.agents_used}`
+  );
   sections.push(``);
 
   return sections.join('\n');

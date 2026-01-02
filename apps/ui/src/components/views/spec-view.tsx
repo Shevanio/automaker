@@ -1,6 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
+import { getElectronAPI } from '@/lib/electron';
 import type { MultiAgentAnalysis } from '@automaker/types';
 
 // Extracted hooks
@@ -22,10 +23,13 @@ import {
 } from './spec-view/dialogs';
 
 // Utilities
-import { formatAnalysisToSpec } from './spec-view/utils';
+import { formatAnalysisToSpec, formatAnalysisToImprovements } from './spec-view/utils';
 
 export function SpecView() {
   const { currentProject, appSpec } = useAppStore();
+
+  // Improvements state
+  const [improvementsContent, setImprovementsContent] = useState('');
 
   // Loading state
   const { isLoading, specExists, loadSpec } = useSpecLoading();
@@ -105,23 +109,45 @@ export function SpecView() {
 
   const handleApplyAnalysis = async (analysisResult: MultiAgentAnalysis) => {
     try {
-      // Format the analysis into a comprehensive spec
+      // Format the analysis into documentation (without warnings)
       const formattedSpec = formatAnalysisToSpec(analysisResult);
 
-      // Update the spec in the editor
+      // Format the improvements/warnings
+      const formattedImprovements = formatAnalysisToImprovements(analysisResult);
+
+      // Update both editors
       handleChange(formattedSpec);
+      setImprovementsContent(formattedImprovements);
 
       // Trigger save (will show unsaved changes indicator)
       setHasChanges(true);
 
-      console.log('✅ Applied multi-agent analysis to spec');
+      console.log('✅ Applied multi-agent analysis: spec + improvements');
     } catch (error) {
       console.error('❌ Failed to apply analysis:', error);
     }
   };
 
-  // Reset hasChanges when spec is reloaded
   // (This is needed because loadSpec updates appSpec in the store)
+
+  // Wrapper to save both spec and improvements
+  const handleSave = async () => {
+    await saveSpec(); // Save spec using the hook
+
+    // Also save improvements if there's content
+    if (currentProject && improvementsContent.trim()) {
+      try {
+        const api = getElectronAPI();
+        await api.writeFile(
+          `${currentProject.path}/.automaker/improvements.md`,
+          improvementsContent
+        );
+        console.log('✅ Saved improvements.md');
+      } catch (error) {
+        console.error('Failed to save improvements:', error);
+      }
+    }
+  };
 
   // No project selected
   if (!currentProject) {
@@ -186,10 +212,15 @@ export function SpecView() {
         errorMessage={errorMessage}
         onRegenerateClick={() => setShowRegenerateDialog(true)}
         onMultiAgentClick={handleMultiAgentAnalysis}
-        onSaveClick={saveSpec}
+        onSaveClick={handleSave}
       />
 
-      <SpecEditor value={appSpec} onChange={handleChange} />
+      <SpecEditor
+        specValue={appSpec}
+        improvementsValue={improvementsContent}
+        onSpecChange={handleChange}
+        onImprovementsChange={setImprovementsContent}
+      />
 
       <RegenerateSpecDialog
         open={showRegenerateDialog}

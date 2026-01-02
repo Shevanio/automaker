@@ -1,4 +1,4 @@
-import { Bot, Loader2, CheckCircle2, XCircle, Clock, Zap, AlertTriangle } from 'lucide-react';
+import { Bot, Loader2, CheckCircle2, XCircle, Zap } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -99,7 +99,7 @@ export function MultiAgentAnalysisModal({
             Multi-Agent Spec Analysis
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Deploy 6 specialized AI agents to analyze your feature from multiple perspectives:
+            Deploy 6 specialized AI agents to document your application from multiple perspectives:
             Frontend, Backend, Database, Security, Testing, and DevOps.
           </DialogDescription>
         </DialogHeader>
@@ -109,10 +109,10 @@ export function MultiAgentAnalysisModal({
           <div className="py-8 space-y-4">
             <div className="text-center">
               <Bot className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">Ready to Analyze</h3>
+              <h3 className="text-lg font-semibold mb-2">Ready to Document</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Six specialized agents will work in parallel to create a comprehensive
-                implementation plan covering all aspects of your feature.
+                Six specialized agents will work in parallel to create comprehensive architectural
+                documentation covering all aspects of your application.
               </p>
             </div>
 
@@ -169,8 +169,7 @@ export function MultiAgentAnalysisModal({
                       </div>
                       {agent.status === 'completed' && agent.tasksCount > 0 && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {agent.tasksCount} task{agent.tasksCount !== 1 ? 's' : ''} identified
-                          {agent.duration && ` • ~${agent.duration}min`}
+                          {agent.tasksCount} summar{agent.tasksCount !== 1 ? 'ies' : 'y'} documented
                         </p>
                       )}
                     </div>
@@ -186,47 +185,20 @@ export function MultiAgentAnalysisModal({
         {isCompleted && analysis && (
           <div className="space-y-6 overflow-y-auto pr-2 max-h-[500px]">
             {/* Overall Summary */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="p-4 rounded-lg border border-border bg-muted/20 text-center">
                 <div className="text-2xl font-bold text-primary">
                   {analysis.combined_steps.length}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">Total Tasks</div>
+                <div className="text-xs text-muted-foreground mt-1">Components Documented</div>
               </div>
               <div className="p-4 rounded-lg border border-border bg-muted/20 text-center">
-                <div className="text-2xl font-bold text-primary flex items-center justify-center gap-1">
-                  <Clock className="w-5 h-5" />
-                  {analysis.metadata.total_duration_mins}m
+                <div className="text-2xl font-bold text-primary">
+                  {analysis.metadata.successful_agents}/{analysis.metadata.agents_used}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">Estimated Duration</div>
-              </div>
-              <div className="p-4 rounded-lg border border-border bg-muted/20 text-center">
-                <div
-                  className={cn(
-                    'text-2xl font-bold',
-                    getComplexityColor(analysis.metadata.complexity_score)
-                  )}
-                >
-                  {analysis.metadata.complexity_score}/10
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">Complexity Score</div>
+                <div className="text-xs text-muted-foreground mt-1">Agents Completed</div>
               </div>
             </div>
-
-            {/* Risk Level */}
-            {analysis.metadata.risk_level && (
-              <div
-                className={cn(
-                  'p-3 rounded-lg border flex items-center gap-2',
-                  getRiskColor(analysis.metadata.risk_level)
-                )}
-              >
-                <AlertTriangle className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  Risk Level: {analysis.metadata.risk_level.toUpperCase()}
-                </span>
-              </div>
-            )}
 
             {/* Agent Results */}
             <div className="space-y-4">
@@ -246,8 +218,8 @@ export function MultiAgentAnalysisModal({
                         {agent.agent_name || agent.specialization}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {agent.tasks_identified?.length || 0} tasks
-                        {agent.duration_ms && ` • ${Math.round(agent.duration_ms / 1000 / 60)}min`}
+                        {agent.tasks_identified?.length || 0} summar
+                        {(agent.tasks_identified?.length || 0) !== 1 ? 'ies' : 'y'}
                       </div>
                     </div>
                     <div className="text-muted-foreground group-open:rotate-180 transition-transform">
@@ -257,7 +229,9 @@ export function MultiAgentAnalysisModal({
                   <div className="p-4 pt-0 space-y-3 border-t border-border">
                     {agent.tasks_identified && agent.tasks_identified.length > 0 && (
                       <div>
-                        <h4 className="text-xs font-semibold mb-2 text-muted-foreground">Tasks</h4>
+                        <h4 className="text-xs font-semibold mb-2 text-muted-foreground">
+                          Architecture Summaries
+                        </h4>
                         <ul className="space-y-1.5">
                           {agent.tasks_identified.map((task) => (
                             <li key={task.id} className="text-sm flex gap-2">

@@ -93,7 +93,7 @@ export class MultiAgentSpecService {
     projectContext: string,
     model?: string
   ): Promise<AgentAnalysis[]> {
-    const MAX_CONCURRENT_AGENTS = 3; // Limit concurrent agents to avoid spawn issues
+    const MAX_CONCURRENT_AGENTS = 1; // Run sequentially to avoid Claude CLI concurrency issues
     logger.info(
       `Running ${agents.length} agents in parallel (max ${MAX_CONCURRENT_AGENTS} concurrent)`
     );
@@ -259,11 +259,14 @@ export class MultiAgentSpecService {
       }
 
       const parsed = this.parseAgentResponse(fullResponse);
-      logger.info(`${agent.name} parsed tasks: ${parsed.tasks?.length || 0}`);
+
+      // Support both old format (tasks) and new format (architecture_summary)
+      const summaries = parsed.architecture_summary || parsed.tasks || [];
+      logger.info(`${agent.name} parsed summaries: ${summaries.length}`);
 
       // Validate that we got meaningful results
-      if (!parsed.tasks || parsed.tasks.length === 0) {
-        logger.warn(`${agent.name} returned NO tasks - response may be malformed`);
+      if (summaries.length === 0) {
+        logger.warn(`${agent.name} returned NO summaries - response may be malformed`);
         logger.warn(`${agent.name} full response for debugging:\n${fullResponse}`);
       }
 
@@ -275,17 +278,18 @@ export class MultiAgentSpecService {
         agent_icon: agent.icon,
         specialization: agent.specialization,
         status: 'completed',
-        tasks_identified: parsed.tasks.map((t: any, idx: number) => ({
-          id: `${agent.specialization}-task-${idx + 1}`,
+        tasks_identified: summaries.map((t: any, idx: number) => ({
+          id: `${agent.specialization}-summary-${idx + 1}`,
           title: t.title,
           description: t.description,
-          estimated_duration_mins: t.estimated_duration_mins || 30,
-          priority: t.priority || 'medium',
-          files_to_create: t.files_to_create || [],
-          files_to_modify: t.files_to_modify || [],
+          // Architecture summary format uses key_files instead of files_to_modify
+          estimated_duration_mins: 0, // Always 0 for documentation
+          priority: 'medium',
+          files_to_create: [],
+          files_to_modify: t.key_files || t.files_to_modify || [],
           tests_required: t.tests_required || [],
           complexity: t.complexity || 5,
-          agent_notes: t.agent_notes,
+          agent_notes: t.technologies?.join(', ') || t.agent_notes || '',
         })),
         insights: parsed.insights || [],
         warnings: parsed.warnings || [],
@@ -330,14 +334,18 @@ export class MultiAgentSpecService {
 
       if (agentAnalysis) {
         for (const task of agentAnalysis.tasks_identified) {
+          // Only use task-specific notes, not agent-level insights/warnings
+          // Insights/warnings are already in agentAnalysis.insights/warnings
+          // and will be rendered separately in the "Agent Insights" section
           const notes: string[] = [];
 
           if (task.agent_notes) {
             notes.push(task.agent_notes);
           }
 
-          agentAnalysis.insights.forEach((i: string) => notes.push(`💡 ${i}`));
-          agentAnalysis.warnings.forEach((w: string) => notes.push(`⚠️  ${w}`));
+          // DO NOT add agent insights/warnings here - they should be in Agent Insights section only
+          // agentAnalysis.insights.forEach((i: string) => notes.push(`💡 ${i}`));  // REMOVED
+          // agentAnalysis.warnings.forEach((w: string) => notes.push(`⚠️  ${w}`)); // REMOVED
 
           steps.push({
             id: `step-${order}`,

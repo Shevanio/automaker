@@ -174,7 +174,11 @@ export class MultiAgentSpecService {
       }
 
       // Parse response
+      logger.info(`${agent.name} raw response length: ${fullResponse.length} chars`);
+      logger.debug(`${agent.name} raw response: ${fullResponse.substring(0, 500)}...`);
+
       const parsed = this.parseAgentResponse(fullResponse);
+      logger.info(`${agent.name} parsed tasks: ${parsed.tasks?.length || 0}`);
 
       const endTime = Date.now();
 

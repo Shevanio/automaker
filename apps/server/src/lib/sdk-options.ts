@@ -500,7 +500,8 @@ export function createCustomOptions(
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('default', config.model),
-    maxTurns: config.maxTurns ?? MAX_TURNS.maximum,
+    // Only set maxTurns if explicitly provided (undefined means let SDK/CLI decide)
+    ...(config.maxTurns !== undefined && { maxTurns: config.maxTurns }),
     cwd: config.cwd,
     ...(effectiveAllowedTools && { allowedTools: effectiveAllowedTools }),
     ...(config.sandbox && { sandbox: config.sandbox }),

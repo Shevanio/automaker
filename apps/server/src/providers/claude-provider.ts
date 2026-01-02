@@ -57,6 +57,9 @@ export class ClaudeProvider extends BaseProvider {
       systemPrompt,
       maxTurns,
       cwd,
+      // CRITICAL: Pass environment variables to subprocess
+      // This fixes "spawn node ENOENT" by ensuring node is in PATH
+      env: process.env as Record<string, string | undefined>,
       // Only restrict tools if explicitly set OR (no MCP / unrestricted disabled)
       ...(allowedTools && shouldRestrictTools && { allowedTools }),
       ...(!allowedTools && shouldRestrictTools && { allowedTools: defaultTools }),
@@ -101,6 +104,14 @@ export class ClaudeProvider extends BaseProvider {
 
     // Execute via Claude Agent SDK
     try {
+      // DEBUG: Log PATH to diagnose spawn ENOENT
+      console.log(
+        '[ClaudeProvider] PATH in sdkOptions.env:',
+        sdkOptions.env?.PATH?.substring(0, 200)
+      );
+      console.log('[ClaudeProvider] process.execPath:', process.execPath);
+      console.log('[ClaudeProvider] sdkOptions keys:', Object.keys(sdkOptions));
+
       const stream = query({ prompt: promptPayload, options: sdkOptions });
 
       // Stream messages directly - they're already in the correct format

@@ -131,13 +131,18 @@ export function getModelForUseCase(
  * Base options that apply to all SDK calls
  */
 function getBaseOptions(): Partial<Options> {
-  return {
-    permissionMode: 'acceptEdits',
+  const baseOpts: Partial<Options> = {
+    permissionMode: 'acceptEdits' as const,
     // CRITICAL: Pass process.env to ensure subprocess inherits correct PATH
     // This fixes "spawn node ENOENT" errors when using tsx/bun/etc
     // See: https://github.com/AutoMaker-Org/automaker/issues/XXX
     env: process.env as Record<string, string | undefined>,
   };
+
+  console.log('[getBaseOptions] Returning options with env?', !!baseOpts.env);
+  console.log('[getBaseOptions] PATH in env:', baseOpts.env?.PATH?.substring(0, 100));
+
+  return baseOpts;
 }
 
 /**

@@ -34,26 +34,56 @@ export function createMultiAgentSpecRoutes(events: EventEmitter) {
    * }
    */
   router.post('/multi-agent-analyze', async (req: Request, res: Response) => {
-    const { featureId, projectPath, agents, model, parallel } = req.body;
+    const { featureId, projectPath, agents, model, parallel, description } = req.body;
 
     // Validate required fields
-    if (!featureId) {
-      return res.status(400).json({ error: 'featureId is required' });
-    }
-
     if (!projectPath) {
-      return res.status(400).json({ error: 'projectPath is required' });
+      return res.status(400).json({
+        success: false,
+        error: 'projectPath is required',
+      });
     }
 
-    logger.info(`Starting multi-agent analysis for feature: ${featureId}`);
+    // Either featureId or description is required
+    if (!featureId && !description) {
+      return res.status(400).json({
+        success: false,
+        error: 'Either featureId or description is required',
+      });
+    }
+
+    logger.info(
+      featureId
+        ? `Starting multi-agent analysis for feature: ${featureId}`
+        : 'Starting multi-agent analysis for app spec'
+    );
 
     try {
-      // Load feature
-      const featureLoader = new FeatureLoader();
-      const feature = await featureLoader.get(projectPath, featureId);
+      let feature;
 
-      if (!feature) {
-        return res.status(404).json({ error: `Feature ${featureId} not found` });
+      if (featureId) {
+        // Load existing feature
+        const featureLoader = new FeatureLoader();
+        feature = await featureLoader.get(projectPath, featureId);
+
+        if (!feature) {
+          return res.status(404).json({
+            success: false,
+            error: `Feature ${featureId} not found`,
+          });
+        }
+      } else {
+        // Create temporary feature from description (for app spec analysis)
+        feature = {
+          id: 'app-spec-analysis',
+          title: 'App Specification Analysis',
+          description: description || 'Analyze the complete application specification',
+          status: 'backlog' as const,
+          steps: [],
+          category: 'feature',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
       }
 
       // Emit started event
@@ -94,8 +124,11 @@ export function createMultiAgentSpecRoutes(events: EventEmitter) {
         `Multi-agent analysis completed: ${analysis.combined_steps.length} steps, ${analysis.metadata.total_duration_mins}min estimated`
       );
 
-      // Return analysis result
-      res.json(analysis);
+      // Return analysis result in expected format
+      res.json({
+        success: true,
+        analysis,
+      });
     } catch (error: any) {
       logger.error('Multi-agent analysis failed:', error);
 
@@ -108,8 +141,8 @@ export function createMultiAgentSpecRoutes(events: EventEmitter) {
       });
 
       res.status(500).json({
-        error: 'Multi-agent analysis failed',
-        message: error.message,
+        success: false,
+        error: error.message || 'Multi-agent analysis failed',
       });
     }
   });

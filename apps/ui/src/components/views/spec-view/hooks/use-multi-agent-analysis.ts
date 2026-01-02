@@ -3,6 +3,7 @@ import type { MultiAgentAnalysis } from '@automaker/types';
 
 interface UseMultiAgentAnalysisOptions {
   featureId?: string;
+  description?: string;
   projectPath: string;
   onComplete?: (analysis: MultiAgentAnalysis) => void;
   onError?: (error: string) => void;
@@ -19,6 +20,7 @@ interface AgentProgress {
 
 export function useMultiAgentAnalysis({
   featureId,
+  description,
   projectPath,
   onComplete,
   onError,
@@ -72,6 +74,7 @@ export function useMultiAgentAnalysis({
           credentials: 'include',
           body: JSON.stringify({
             featureId,
+            description,
             projectPath,
             parallel: options?.parallel ?? true,
             agents: options?.agents,
@@ -98,8 +101,10 @@ export function useMultiAgentAnalysis({
                 return {
                   ...agent,
                   status: 'completed' as const,
-                  tasksCount: agentData.analysis.proposed_steps?.length || 0,
-                  duration: agentData.analysis.estimated_duration_mins,
+                  tasksCount: agentData.tasks_identified?.length || 0,
+                  duration: agentData.duration_ms
+                    ? Math.round(agentData.duration_ms / 1000 / 60)
+                    : undefined,
                 };
               }
               return agent;

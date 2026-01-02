@@ -26,15 +26,19 @@ The multi-agent spec generation feature was returning empty or very short respon
 
 - **Resolution**: Made maxTurns optional in createCustomOptions, defaults to SDK behavior
 
-### 4. Empty Agent Responses ⚠️ IN PROGRESS (commit df74f0a)
+### 4. Empty Agent Responses ✅ RESOLVED (commit df74f0a)
 
 **Symptom**: Agents return 0-102 characters instead of full JSON analysis
 
-- **Likely causes**:
-  - Agents not using Read/Glob/Grep tools to explore codebase
-  - Confusing prompt about output format (said "no markdown" but showed markdown example)
-  - Model not clear on what to do
-  - maxTurns too restrictive or too permissive
+- **Cause**: Confusing prompt about output format and unclear instructions
+- **Fix**: Improved prompts with explicit workflow and critical rules
+
+### 5. Generating Tasks Instead of Documentation ✅ FIXED (commit b8b6a44)
+
+**Symptom**: Agents return implementation tasks ("Create X", "Implement Y") instead of documenting existing architecture
+
+- **Cause**: Prompt said "identify ALL tasks needed to implement this feature" which instructed agents to create implementation plans
+- **Fix**: Changed prompt to "DOCUMENT the current state" with documentation-focused examples and structure
 
 ## Changes Made (Commit df74f0a)
 

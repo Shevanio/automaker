@@ -133,6 +133,10 @@ export function getModelForUseCase(
 function getBaseOptions(): Partial<Options> {
   return {
     permissionMode: 'acceptEdits',
+    // CRITICAL: Pass process.env to ensure subprocess inherits correct PATH
+    // This fixes "spawn node ENOENT" errors when using tsx/bun/etc
+    // See: https://github.com/AutoMaker-Org/automaker/issues/XXX
+    env: process.env as Record<string, string | undefined>,
   };
 }
 

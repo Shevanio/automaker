@@ -6,7 +6,6 @@
  */
 
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
-import { spawn } from 'child_process';
 import { BaseProvider } from './base-provider.js';
 import { classifyError, getUserFriendlyErrorMessage } from '@automaker/utils';
 import type {
@@ -58,20 +57,18 @@ export class ClaudeProvider extends BaseProvider {
       systemPrompt,
       maxTurns,
       cwd,
-      // CRITICAL: Pass environment variables to subprocess
-      env: process.env as Record<string, string | undefined>,
-      // CRITICAL: Override spawn to use process.execPath instead of "node"
-      // This fixes "spawn node ENOENT" by using the full path to the node binary
-      spawnClaudeCodeProcess: (spawnOptions) => {
-        // Use process.execPath (full path to node) instead of "node" string
-        // This ensures subprocess can find the node executable
-        return spawn(process.execPath, spawnOptions.args, {
-          cwd: spawnOptions.cwd,
-          env: spawnOptions.env,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          signal: spawnOptions.signal,
-        });
-      },
+      // CRITICAL: Specify exact path to Claude Code executable
+      // This prevents "spawn ENOENT" by using full path instead of relying on PATH lookup
+      pathToClaudeCodeExecutable: '/home/linuxbrew/.linuxbrew/bin/claude',
+      // CRITICAL: Pass environment variables to subprocess with explicit LD_LIBRARY_PATH
+      env: {
+        ...process.env,
+        // Add Linuxbrew library paths to fix dynamic linker issues
+        LD_LIBRARY_PATH:
+          ['/home/linuxbrew/.linuxbrew/lib', process.env.LD_LIBRARY_PATH]
+            .filter((x): x is string => Boolean(x))
+            .join(':') || undefined,
+      } as Record<string, string | undefined>,
       // Only restrict tools if explicitly set OR (no MCP / unrestricted disabled)
       ...(allowedTools && shouldRestrictTools && { allowedTools }),
       ...(!allowedTools && shouldRestrictTools && { allowedTools: defaultTools }),
@@ -116,12 +113,18 @@ export class ClaudeProvider extends BaseProvider {
 
     // Execute via Claude Agent SDK
     try {
-      // DEBUG: Log PATH to diagnose spawn ENOENT
-      console.log('[ClaudeProvider] FULL PATH in sdkOptions.env:', sdkOptions.env?.PATH);
+      // DEBUG: Comprehensive logging for spawn diagnosis
+      console.log('[ClaudeProvider] SDK Options being passed:', {
+        model: sdkOptions.model,
+        cwd: sdkOptions.cwd,
+        pathToClaudeCodeExecutable: sdkOptions.pathToClaudeCodeExecutable,
+        hasEnv: !!sdkOptions.env,
+        PATH: sdkOptions.env?.PATH?.substring(0, 200) + '...',
+      });
       console.log('[ClaudeProvider] process.execPath:', process.execPath);
       console.log(
-        '[ClaudeProvider] PATH includes linuxbrew?',
-        sdkOptions.env?.PATH?.includes('linuxbrew')
+        '[ClaudeProvider] Current process.env.PATH:',
+        process.env.PATH?.substring(0, 200)
       );
 
       const stream = query({ prompt: promptPayload, options: sdkOptions });

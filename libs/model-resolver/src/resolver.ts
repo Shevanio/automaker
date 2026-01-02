@@ -25,17 +25,18 @@ export function resolveModelString(
     return defaultModel;
   }
 
-  // Full Claude model string - pass through unchanged
-  if (modelKey.includes('claude-')) {
-    console.log(`[ModelResolver] Using full Claude model string: ${modelKey}`);
-    return modelKey;
-  }
-
-  // Look up Claude model alias
+  // Look up Claude model alias first (e.g., "sonnet", "opus", "haiku")
   const resolved = CLAUDE_MODEL_MAP[modelKey];
   if (resolved) {
     console.log(`[ModelResolver] Resolved model alias: "${modelKey}" -> "${resolved}"`);
     return resolved;
+  }
+
+  // Full Claude model string with date - pass through unchanged
+  // Valid format: claude-{model}-{version}-{date} (e.g., claude-sonnet-4-5-20250929)
+  if (modelKey.includes('claude-') && /\d{8}$/.test(modelKey)) {
+    console.log(`[ModelResolver] Using full Claude model string: ${modelKey}`);
+    return modelKey;
   }
 
   // Unknown model key - use default

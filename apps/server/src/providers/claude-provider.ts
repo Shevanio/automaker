@@ -104,6 +104,28 @@ export class ClaudeProvider extends BaseProvider {
 
     // Execute via Claude Agent SDK
     try {
+      // DEBUG: Log ALL SDK options being passed
+      console.log(
+        '[ClaudeProvider] FULL SDK OPTIONS:',
+        JSON.stringify(
+          {
+            model: sdkOptions.model,
+            cwd: sdkOptions.cwd,
+            systemPrompt:
+              typeof sdkOptions.systemPrompt === 'string'
+                ? sdkOptions.systemPrompt.substring(0, 100)
+                : sdkOptions.systemPrompt,
+            maxTurns: sdkOptions.maxTurns,
+            allowedTools: sdkOptions.allowedTools,
+            permissionMode: sdkOptions.permissionMode,
+            allowDangerouslySkipPermissions: sdkOptions.allowDangerouslySkipPermissions,
+            settingSources: sdkOptions.settingSources,
+          },
+          null,
+          2
+        )
+      );
+
       const stream = query({ prompt: promptPayload, options: sdkOptions });
 
       // Stream messages directly - they're already in the correct format

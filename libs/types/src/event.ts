@@ -26,6 +26,10 @@ export type EventType =
   | 'project:analysis-error'
   | 'suggestions:event'
   | 'spec-regeneration:event'
-  | 'issue-validation:event';
+  | 'issue-validation:event'
+  | 'multi-agent:started'
+  | 'multi-agent:agent-progress'
+  | 'multi-agent:completed'
+  | 'multi-agent:error';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;

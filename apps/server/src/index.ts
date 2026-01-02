@@ -64,6 +64,7 @@ import { MCPTestService } from './services/mcp-test-service.js';
 import { createPipelineRoutes } from './routes/pipeline/index.js';
 import { pipelineService } from './services/pipeline-service.js';
 import { getServerConfig } from './config/env.js';
+import { createMultiAgentSpecRoutes } from './routes/spec/multi-agent.js';
 
 // Load environment variables
 dotenv.config();
@@ -283,6 +284,8 @@ app.use('/api/context', createContextRoutes(settingsService));
 app.use('/api/backlog-plan', agentLimiter, createBacklogPlanRoutes(events, settingsService));
 app.use('/api/mcp', createMCPRoutes(mcpTestService));
 app.use('/api/pipeline', createPipelineRoutes(pipelineService));
+// Multi-Agent Spec Generation (AI-powered, apply agent rate limiting)
+app.use('/api/spec', agentLimiter, createMultiAgentSpecRoutes(events));
 
 // Create HTTP server
 const server = createServer(app);

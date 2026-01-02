@@ -192,7 +192,8 @@ export class MultiAgentSpecService {
         cwd: projectPath || process.cwd(), // CRITICAL: Use project PATH, not context string
         model: model || agent.model || 'claude-sonnet-4',
         systemPrompt: agent.systemPrompt,
-        maxTurns: 1, // Single turn for analysis
+        // NOTE: Removed maxTurns - not supported by Claude CLI 2.0.57
+        // The agent will naturally stop after analyzing since it's read-only tools
         allowedTools: TOOL_PRESETS.readOnly, // Read-only tools for analysis
       });
 

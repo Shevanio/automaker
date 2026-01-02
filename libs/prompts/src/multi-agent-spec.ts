@@ -30,6 +30,13 @@ ${featureDescription}
 
 As a ${agentFocus} expert, identify ALL tasks needed in your domain to implement this feature successfully.
 
+**CRITICAL FIRST STEP**: Before analyzing, you MUST:
+1. Use the **Glob** tool to find relevant files (e.g., \`Glob pattern="**/*.tsx"\` for React components)
+2. Use the **Read** tool to examine existing code structure
+3. Use the **Grep** tool to search for related patterns or implementations
+
+Only AFTER using these tools to understand the codebase should you provide your analysis.
+
 ### For Each Task, Provide:
 
 1. **title**: Clear, action-oriented title (e.g., "Create user profile component")
@@ -59,7 +66,7 @@ As a ${agentFocus} expert, identify ALL tasks needed in your domain to implement
 
 ## Output Format
 
-Return ONLY valid JSON (no markdown, no explanation):
+You MUST respond with ONLY a JSON code block in this exact format (nothing before, nothing after):
 
 \`\`\`json
 {
@@ -91,7 +98,12 @@ Return ONLY valid JSON (no markdown, no explanation):
 }
 \`\`\`
 
-IMPORTANT: Return ONLY the JSON object. Do not include explanatory text before or after.`;
+CRITICAL RULES:
+1. Your response must START with \`\`\`json and END with \`\`\`
+2. Do NOT add any text before or after the JSON code block
+3. Use the Read, Glob, and Grep tools to analyze the project before responding
+4. The JSON must be valid and parseable
+5. Include at least 2-5 tasks in the tasks array (empty arrays are NOT acceptable)`;
 }
 
 /**

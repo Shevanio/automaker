@@ -190,10 +190,9 @@ export class MultiAgentSpecService {
       // Build SDK options using centralized factory (same pattern as AgentService)
       const sdkOptions = createCustomOptions({
         cwd: projectPath || process.cwd(), // CRITICAL: Use project PATH, not context string
-        model: model || agent.model || 'claude-sonnet-4',
+        model: model || agent.model || 'sonnet', // Use alias 'sonnet' for cheaper, faster model
         systemPrompt: agent.systemPrompt,
-        // NOTE: Removed maxTurns - not supported by Claude CLI 2.0.57
-        // The agent will naturally stop after analyzing since it's read-only tools
+        maxTurns: 50, // Give enough turns to analyze but not too many
         allowedTools: TOOL_PRESETS.readOnly, // Read-only tools for analysis
       });
 
@@ -212,24 +211,61 @@ export class MultiAgentSpecService {
       // Call Claude using executeQuery generator
       const generator = this.claudeProvider.executeQuery(options);
 
-      // Collect full response
+      // Collect full response with detailed logging
       let fullResponse = '';
+      let messageCount = 0;
+      let textBlockCount = 0;
+
       for await (const providerMessage of generator) {
+        messageCount++;
+        logger.debug(
+          `${agent.name} received message #${messageCount}, type: ${providerMessage.type}`
+        );
+
         if (providerMessage.type === 'assistant' && providerMessage.message) {
           for (const block of providerMessage.message.content) {
+            logger.debug(`${agent.name} content block type: ${block.type}`);
             if (block.type === 'text' && block.text) {
+              textBlockCount++;
               fullResponse += block.text;
+              logger.debug(
+                `${agent.name} text block #${textBlockCount} length: ${block.text.length}`
+              );
             }
           }
+        } else if (providerMessage.type === 'error') {
+          logger.error(`${agent.name} error message:`, providerMessage);
         }
       }
 
       // Parse response
+      logger.info(`${agent.name} received ${messageCount} messages, ${textBlockCount} text blocks`);
       logger.info(`${agent.name} raw response length: ${fullResponse.length} chars`);
-      logger.debug(`${agent.name} raw response: ${fullResponse.substring(0, 500)}...`);
+      if (fullResponse.length > 0) {
+        logger.info(`${agent.name} raw response preview: ${fullResponse.substring(0, 500)}...`);
+      } else {
+        logger.warn(`${agent.name} returned EMPTY response - no text content received`);
+      }
+
+      // Handle empty responses
+      if (fullResponse.length === 0) {
+        throw new Error(
+          `Agent returned empty response. This usually means:\n` +
+            `1. The agent didn't use any tools to read project files\n` +
+            `2. The prompt wasn't clear enough\n` +
+            `3. The model hit a token limit or error\n` +
+            `Check logs for tool usage and error messages.`
+        );
+      }
 
       const parsed = this.parseAgentResponse(fullResponse);
       logger.info(`${agent.name} parsed tasks: ${parsed.tasks?.length || 0}`);
+
+      // Validate that we got meaningful results
+      if (!parsed.tasks || parsed.tasks.length === 0) {
+        logger.warn(`${agent.name} returned NO tasks - response may be malformed`);
+        logger.warn(`${agent.name} full response for debugging:\n${fullResponse}`);
+      }
 
       const endTime = Date.now();
 

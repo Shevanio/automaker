@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Save, Sparkles, Loader2, FileText, AlertCircle } from 'lucide-react';
+import { Save, Sparkles, Loader2, FileText, AlertCircle, Bot } from 'lucide-react';
 import { PHASE_LABELS } from '../constants';
 
 interface SpecHeaderProps {
@@ -12,6 +12,7 @@ interface SpecHeaderProps {
   currentPhase: string;
   errorMessage: string;
   onRegenerateClick: () => void;
+  onMultiAgentClick?: () => void;
   onSaveClick: () => void;
 }
 
@@ -25,6 +26,7 @@ export function SpecHeader({
   currentPhase,
   errorMessage,
   onRegenerateClick,
+  onMultiAgentClick,
   onSaveClick,
 }: SpecHeaderProps) {
   const isProcessing = isRegenerating || isCreating || isGeneratingFeatures;
@@ -76,6 +78,19 @@ export function SpecHeader({
           </div>
         )}
         <div className="flex gap-2">
+          {onMultiAgentClick && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onMultiAgentClick}
+              disabled={isProcessing}
+              data-testid="multi-agent-analyze"
+              className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-purple-500/30 hover:from-purple-500/20 hover:to-blue-500/20"
+            >
+              <Bot className="w-4 h-4 mr-2" />
+              🤖 Analizar Automáticamente
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"

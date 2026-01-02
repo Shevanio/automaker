@@ -82,7 +82,9 @@ export function SpecView() {
     runAnalysis,
     reset: resetAnalysis,
   } = useMultiAgentAnalysis({
-    description: appSpec, // Pass the current spec as description for analysis
+    description:
+      appSpec ||
+      'Analyze this project and create a comprehensive specification covering all aspects of the application.', // Fallback for empty specs
     projectPath: currentProject?.path || '',
     onComplete: (analysis) => {
       console.log('Multi-agent analysis completed:', analysis);

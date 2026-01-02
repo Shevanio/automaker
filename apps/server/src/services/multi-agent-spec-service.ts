@@ -14,11 +14,13 @@ import type {
   CombinedSpecMetadata,
   AgentSpecialization,
   MultiAgentAnalysisRequest,
+  ExecuteOptions,
 } from '@automaker/types';
 import { DEFAULT_AGENTS } from '@automaker/types';
 import { buildMultiAgentAnalysisPrompt } from '@automaker/prompts';
 import { createLogger } from '@automaker/utils';
 import type { ClaudeProvider } from '../providers/claude-provider.js';
+import { createCustomOptions, TOOL_PRESETS } from '../lib/sdk-options.js';
 
 const logger = createLogger('MultiAgentSpecService');
 
@@ -152,14 +154,29 @@ export class MultiAgentSpecService {
     });
 
     try {
-      // Call Claude using executeQuery generator
-      const generator = this.claudeProvider.executeQuery({
-        prompt,
+      // Build SDK options using centralized factory (same pattern as AgentService)
+      const sdkOptions = createCustomOptions({
+        cwd: projectContext || process.cwd(),
         model: model || agent.model || 'claude-sonnet-4',
         systemPrompt: agent.systemPrompt,
-        cwd: projectContext || process.cwd(),
         maxTurns: 1, // Single turn for analysis
+        allowedTools: TOOL_PRESETS.readOnly, // Read-only tools for analysis
       });
+
+      // Build ExecuteOptions from SDK options (same pattern as AgentService:282-297)
+      const options: ExecuteOptions = {
+        prompt,
+        model: sdkOptions.model!,
+        cwd: sdkOptions.cwd!,
+        systemPrompt: sdkOptions.systemPrompt,
+        maxTurns: sdkOptions.maxTurns,
+        allowedTools: sdkOptions.allowedTools as string[] | undefined,
+        settingSources: sdkOptions.settingSources,
+        sandbox: sdkOptions.sandbox,
+      };
+
+      // Call Claude using executeQuery generator
+      const generator = this.claudeProvider.executeQuery(options);
 
       // Collect full response
       let fullResponse = '';

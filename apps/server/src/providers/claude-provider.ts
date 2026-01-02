@@ -6,6 +6,7 @@
  */
 
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
+import { realpathSync, existsSync } from 'fs';
 import { BaseProvider } from './base-provider.js';
 import { classifyError, getUserFriendlyErrorMessage } from '@automaker/utils';
 import type {
@@ -58,8 +59,8 @@ export class ClaudeProvider extends BaseProvider {
       maxTurns,
       cwd,
       // CRITICAL: Specify exact path to Claude Code executable
-      // This prevents "spawn ENOENT" by using full path instead of relying on PATH lookup
-      pathToClaudeCodeExecutable: '/home/linuxbrew/.linuxbrew/bin/claude',
+      // Use resolved path (not symlink) to avoid spawn issues
+      pathToClaudeCodeExecutable: '/home/linuxbrew/.linuxbrew/Caskroom/claude-code/2.0.57/claude',
       // CRITICAL: Pass environment variables to subprocess with explicit LD_LIBRARY_PATH
       env: {
         ...process.env,
@@ -68,6 +69,8 @@ export class ClaudeProvider extends BaseProvider {
           ['/home/linuxbrew/.linuxbrew/lib', process.env.LD_LIBRARY_PATH]
             .filter((x): x is string => Boolean(x))
             .join(':') || undefined,
+        // Enable SDK debug logging to diagnose spawn issues
+        DEBUG_CLAUDE_AGENT_SDK: '1',
       } as Record<string, string | undefined>,
       // Only restrict tools if explicitly set OR (no MCP / unrestricted disabled)
       ...(allowedTools && shouldRestrictTools && { allowedTools }),

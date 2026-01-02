@@ -48,8 +48,14 @@ export class MultiAgentSpecService {
     // Run agents in parallel or sequentially
     const parallel = request?.parallel !== false; // Default to true
     const agentAnalyses = parallel
-      ? await this.runAgentsParallel(feature, agents, projectContext, request?.model)
-      : await this.runAgentsSequential(feature, agents, projectContext, request?.model);
+      ? await this.runAgentsParallel(feature, agents, projectPath, projectContext, request?.model)
+      : await this.runAgentsSequential(
+          feature,
+          agents,
+          projectPath,
+          projectContext,
+          request?.model
+        );
 
     // Combine analyses into unified spec
     const combinedSteps = this.combineAnalyses(agentAnalyses);
@@ -83,6 +89,7 @@ export class MultiAgentSpecService {
   private async runAgentsParallel(
     feature: Feature,
     agents: SpecializationAgent[],
+    projectPath: string,
     projectContext: string,
     model?: string
   ): Promise<AgentAnalysis[]> {
@@ -101,7 +108,7 @@ export class MultiAgentSpecService {
       );
 
       const batchPromises = batch.map((agent) =>
-        this.runSingleAgent(feature, agent, projectContext, model)
+        this.runSingleAgent(feature, agent, projectPath, projectContext, model)
       );
 
       const batchResults = await Promise.allSettled(batchPromises);
@@ -129,6 +136,7 @@ export class MultiAgentSpecService {
   private async runAgentsSequential(
     feature: Feature,
     agents: SpecializationAgent[],
+    projectPath: string,
     projectContext: string,
     model?: string
   ): Promise<AgentAnalysis[]> {
@@ -138,7 +146,13 @@ export class MultiAgentSpecService {
 
     for (const agent of agents) {
       try {
-        const analysis = await this.runSingleAgent(feature, agent, projectContext, model);
+        const analysis = await this.runSingleAgent(
+          feature,
+          agent,
+          projectPath,
+          projectContext,
+          model
+        );
         results.push(analysis);
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
@@ -156,6 +170,7 @@ export class MultiAgentSpecService {
   private async runSingleAgent(
     feature: Feature,
     agent: SpecializationAgent,
+    projectPath: string,
     projectContext: string,
     model?: string
   ): Promise<AgentAnalysis> {
@@ -174,7 +189,7 @@ export class MultiAgentSpecService {
     try {
       // Build SDK options using centralized factory (same pattern as AgentService)
       const sdkOptions = createCustomOptions({
-        cwd: projectContext || process.cwd(),
+        cwd: projectPath || process.cwd(), // CRITICAL: Use project PATH, not context string
         model: model || agent.model || 'claude-sonnet-4',
         systemPrompt: agent.systemPrompt,
         maxTurns: 1, // Single turn for analysis
